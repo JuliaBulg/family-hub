@@ -1,0 +1,90 @@
+FAMILY HOME HUB — PROJECT RECORD
+Date: 27 May 2026
+==============================================
+
+
+WHAT WE BUILT
+--------------
+
+1. PANTRY MODULE (fully working)
+
+   - "Add Item" button opens a full-screen modal where you can enter:
+     Item name, category, quantity, unit, expiry date
+   - Items are saved to the database (Supabase) and appear in the pantry list
+   - Items expiring soon show a warning banner at the top
+   - Expired items show a red alert
+
+   Fixes applied:
+   - Modal scrolling was broken on Safari → fixed
+   - Date picker calendar was cut off at the bottom → fixed
+   - "Add to Pantry" button was hidden behind the navigation bar → fixed
+   - Added always-visible scrollbar on the right side of the modal
+
+2. IMPORT FROM RECEIPT (fully working)
+
+   - New "🧾 From Receipt" button on the Pantry page
+   - Two options:
+       Photo tab — take a photo of your grocery receipt
+       Paste Text tab — copy and paste receipt text manually
+   - AI (Claude) reads the receipt and extracts all products automatically
+   - Review screen shows all found items with checkboxes
+   - You can edit item names, change categories, deselect items you don't want
+   - "Add to Pantry" button saves everything selected in one go
+
+
+----------------------------------------------
+WHAT YOU ARE PAYING FOR
+----------------------------------------------
+
+SERVICE         PLAN            COST
+Supabase        Free plan       €0/month  (database storage)
+Anthropic       Pay-as-you-go   ~€0.01 per receipt scan
+                Credit loaded:  $5 USD (enough for ~500-1000 scans)
+
+You can top up Anthropic credit any time at console.anthropic.com
+
+
+----------------------------------------------
+TECHNICAL DETAILS (for reference)
+----------------------------------------------
+
+Project folder:   /Users/juliab/my-website/home-hub/family-hub
+Database:         Supabase — project kqolxqefwimfujwmejfn
+                  Table: pantry_items
+AI model used:    Claude Opus 4.7 (Anthropic)
+
+To start the app:
+  1. Open Terminal
+  2. Type:  cd /Users/juliab/my-website/home-hub/family-hub
+  3. Type:  npm run dev
+  4. Open browser at http://localhost:3000
+
+
+----------------------------------------------
+WHAT IS NEXT (future sessions)
+----------------------------------------------
+
+The app has 4 tabs. Pantry is done. Still to build:
+
+  🛒  Shopping  — shopping list, could auto-suggest low pantry items
+  🍽️  Menu      — weekly meal planner
+  💰  Expenses  — track household spending
+
+Pick whichever you'd like to work on next!
+
+
+----------------------------------------------
+FILES CREATED / MODIFIED THIS SESSION
+----------------------------------------------
+
+NEW FILES:
+  src/components/ImportReceiptModal.tsx   — receipt import modal
+  src/app/api/parse-receipt/route.ts      — AI API endpoint
+
+MODIFIED FILES:
+  src/app/page.tsx                        — added Import button + modal
+  src/components/AddPantryItemModal.tsx   — multiple UX fixes
+  .env.local                              — added Anthropic API key
+
+==============================================
+End of record
