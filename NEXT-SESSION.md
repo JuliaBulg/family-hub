@@ -1,171 +1,158 @@
 # Family Hub — Next Session Starting Point
 
-**Written:** 07-Jun-2026
-**Session status:** Auth + setup flow fully working end to end. RLS fixed. Ready to wire household data and build invite link.
+**Written:** 09-Jun-2026
+**Session status:** Session 6 complete. Expenses tab, receipt→expense import, PDF receipts, shopping delete fix, Vercel deployment. Live at https://family-hub-seven-sigma.vercel.app
 
 ---
 
-## What was built this session (session 4 — 07-Jun-2026)
-
-### Full auth + setup flow — now working end to end
+## What was built in session 6
 
 | What | Where | Notes |
 |------|-------|-------|
-| PKCE callback page | `src/app/auth/callback/page.tsx` | Exchanges `?code=` from email confirmation link for a session via `supabase.auth.exchangeCodeForSession(code)` |
-| Setup page | `src/app/setup/page.tsx` | Post-confirmation screen — user enters display name + household name; creates household row then profile row; redirects to pantry |
-| `applyProfile()` in AuthContext | `src/contexts/AuthContext.tsx` | Injects profile directly into React state without a SELECT round-trip, avoiding any RLS dependency on the profile read after setup |
-| `flowType: 'pkce'` + `emailRedirectTo` | `src/lib/supabase.ts` + `src/app/signup/page.tsx` | Required for PKCE email confirmation to work correctly |
-| INSERT instead of upsert in setup | `src/app/setup/page.tsx` | Upsert internally SELECTs to check for conflict — triggers RLS. Plain INSERT only checks the INSERT policy (non-recursive). 23505 unique conflict handled gracefully. |
+| Added by label | `src/app/shopping/page.tsx` | Shows `by [Name]` under each shopping item |
+| Role editing | `src/components/ProfileSheet.tsx` | Parents can change any member's role (Parent ↔ Child) via buttons next to each member |
+| Join page role default | `src/app/join/page.tsx` | Default role is now `parent`; explicit two-button selector UI |
+| Shared categories | `src/lib/categories.ts` | Single source of truth for all 7 categories used by pantry, expenses, and receipt import |
+| Expenses tab | `src/app/expenses/page.tsx` | Month navigation, total card, category breakdown with progress bars, expandable rows |
+| Add Expense modal | `src/components/AddExpenseModal.tsx` | Amount, category grid, store, note, date fields; saves to `expenses` table |
+| Receipt → expense auto-log | `src/components/ImportReceiptModal.tsx` | Step 4: per-category amounts pre-filled from AI-extracted prices; one DB row per category |
+| PDF receipt support | `src/app/api/parse-receipt/route.ts` | Anthropic `document` content block; max_tokens raised to 8096 |
+| PDF UX polish | `src/components/ImportReceiptModal.tsx` | Blue card for PDF preview; "Large PDFs can take up to 30 seconds" message |
+| Expiry alert fix | `src/app/page.tsx` | `shoppingNames` Set fetched from DB; alert never re-shows if item is on shopping list |
+| Shopping delete fix | `src/app/shopping/page.tsx` | Immediate DB delete on ✕; undo re-inserts a fresh row — no reappearance on navigation |
+| Vercel deployment | — | Auto-deploys on push to `main` via https://github.com/JuliaBulg/family-hub.git |
 
-### RLS infinite recursion fixed (42P17)
+---
 
-The profiles SELECT policy `"Users can read profiles in their household"` was self-referencing — it queried `profiles` from within a policy ON `profiles`, causing PostgreSQL error 42P17 on every SELECT.
+## Current state of the app
 
-**Fix:** Used a PL/pgSQL `DO` block to drop **all** policies on `profiles` regardless of name (so stale renamed policies couldn't hide), then recreated them cleanly:
+| Feature | Status | Notes |
+|---------|--------|-------|
+| Auth (signup, login, forgot password) | ✅ Working | PKCE flow, email confirmation |
+| Household creation | ✅ Working | /setup page |
+| Invite link (/join) | ✅ Working | `?code=` lookup, role selector, default parent |
+| Profile sheet | ✅ Working | Members list, role badges, parents can edit roles |
+| Pantry | ✅ Working | Categories, expiry alerts, cook tonight (placeholder) |
+| From Receipt (pantry) | ✅ Working | Image + PDF; adds to pantry AND logs expenses per category |
+| Shopping list | ✅ Working | Add, tick, delete (immediate + undo), "added by" label |
+| Expenses tab | ✅ Working | Month nav, total, category bars, expandable expense rows |
+| Add Expense modal | ✅ Working | Manual entry from Expenses tab |
+| Meal Planner | 🚧 Placeholder | Menu tab shows "coming soon" |
 
+---
+
+## Priority 1 — Husband's receipt upload issue (investigate first)
+
+The user mentioned their husband had a problem uploading a receipt. Not investigated yet. Likely causes:
+- PDF too large for Anthropic API (20MB limit)
+- Non-receipt document
+- Network timeout on mobile
+
+Reproduce: have husband re-try. If it fails, get the exact error shown and check Vercel function logs.
+
+---
+
+## Priority 2 — Meal Planner (next major feature)
+
+The Meal Planner tab (`src/app/menu/page.tsx`) is a placeholder. Proposed scope:
+- View meals planned for the current week (Mon–Sun)
+- Add a meal to a day + slot (breakfast / lunch / dinner)
+- Delete a meal
+- "What can I cook tonight?" button on Pantry tab → AI suggestion from current pantry items (modal already wired up)
+
+**DB tables needed:**
 ```sql
-do $$ declare pol record; begin
-  for pol in select policyname from pg_policies where tablename = 'profiles' and schemaname = 'public'
-  loop execute format('drop policy %I on public.profiles', pol.policyname); end loop;
-end; $$;
+create table meal_plans (
+  id uuid primary key default gen_random_uuid(),
+  household_id uuid not null references households(id),
+  week_start date not null,
+  created_at timestamptz default now()
+);
 
-create or replace function get_my_household_id()
-returns uuid language sql security definer stable set search_path = public as $$
-  select household_id from public.profiles where user_id = auth.uid() limit 1
-$$;
-
-create policy "own profile select" on public.profiles for select using (user_id = auth.uid());
-create policy "household profiles select" on public.profiles for select using (household_id = get_my_household_id());
-create policy "own profile insert" on public.profiles for insert with check (user_id = auth.uid());
-create policy "own profile update" on public.profiles for update using (user_id = auth.uid());
-```
-
-The `get_my_household_id()` function runs as `SECURITY DEFINER` (bypasses RLS on profiles) — breaks the self-referential cycle for any policy that needs to know the user's household.
-
----
-
-## State of the app right now
-
-- **Auth + setup:** ✅ Signup → email confirmation → /auth/callback → /setup (name + household) → pantry — fully working
-- **Login / forgot password:** ✅ Working
-- **Profile sheet:** ✅ Avatar top-right on all pages; sheet shows name, email, household, role, sign out
-- **Pantry:** ✅ Add, edit, delete, categories, expiry alerts, import from receipt — but inserts **do not pass `household_id`** yet
-- **Shopping list:** ✅ Add, tick off, clear done — but inserts **do not pass `household_id`** yet
-- **Invite link (`/join`):** 🚧 Not yet built — family members cannot join yet
-- **Menu / Expenses:** 🚧 Placeholder pages only
-
----
-
-## Priority 1 — Wire `household_id` + `added_by` to inserts (DO THIS FIRST)
-
-The `household_id` and `added_by` columns exist in the DB and RLS policies are live, but the React components still do unscoped inserts. Once a second user tries to join, writes will be blocked by RLS and items will be invisible across the household.
-
-### `src/components/AddPantryItemModal.tsx`
-
-```ts
-const { profile } = useAuth()
-// in the insert call:
-.insert({ ...fields, household_id: profile?.household_id, added_by: profile?.display_name })
-```
-
-### `src/components/AddShoppingItemModal.tsx`
-
-```ts
-const { profile } = useAuth()
-.insert({ name, quantity: qty || null, checked: false, household_id: profile?.household_id, added_by: profile?.display_name })
-```
-
-### `src/app/page.tsx` — `addExpiredToShopping()` function
-
-```ts
-const { profile } = useAuth()
-// in the batch insert:
-groups.map(group => ({
-  name: group[0].name,
-  quantity: groupQuantity(group) || null,
-  checked: false,
-  household_id: profile?.household_id,
-  added_by: profile?.display_name,
-}))
+create table meals (
+  id uuid primary key default gen_random_uuid(),
+  meal_plan_id uuid not null references meal_plans(id) on delete cascade,
+  day text not null,       -- 'mon', 'tue', etc.
+  slot text not null,      -- 'breakfast', 'lunch', 'dinner'
+  name text not null,
+  added_by text,
+  created_at timestamptz default now()
+);
 ```
 
 ---
 
-## Priority 2 — Build the `/join` invite page
+## Priority 3 — Shopping list → Pantry loop
 
-New file: `src/app/join/page.tsx`
+When "Done shopping (N)" is tapped, offer to move ticked items into pantry. Reduces re-entry after a shopping trip.
 
-Flow:
-1. Read `?code=xxx&role=child` from URL via `useSearchParams()`
-2. Query: `SELECT id, name FROM households WHERE invite_code = code`
-3. Not found → show error "This invite link is not valid"
-4. Found → show signup form (name + email + password) with the household name visible
-5. On submit: `supabase.auth.signUp()` → INSERT profile with `household_id` from step 2, `role` from URL
-6. Redirect to `/` on success
-
-Add `/join` to `PUBLIC_ROUTES` in `src/components/AuthShell.tsx`:
-```ts
-const PUBLIC_ROUTES = ['/login', '/signup', '/join', '/auth/callback']
-```
-
-Also needed: a way for the parent to generate and share the invite link. Options:
-- Button in ProfileSheet: "Invite a family member" → copies link to clipboard
-- Or a dedicated `/settings` page (heavier, defer)
-- Simplest: add "Copy invite link" button to ProfileSheet; calls Supabase to fetch/generate `households.invite_code` and copies `${origin}/join?code=${code}&role=child` to clipboard
-
-The `invite_code` column already exists on `households`. If it's null, generate a random short code on first share:
-```ts
-const code = Math.random().toString(36).slice(2, 10) // e.g. "a3f9bc12"
-await supabase.from('households').update({ invite_code: code }).eq('id', profile.household_id)
-```
+Flow: tap "Done shopping" → sheet shows ticked items with category picker → confirm → insert into `pantry_items`, delete from `shopping_items`.
 
 ---
 
-## Priority 3 — Display "Added by [Name]" on shopping items
+## Priority 4 — Transport / custom categories (future)
 
-Once `added_by` is being saved (Priority 1), update `src/app/shopping/page.tsx` to show it under each item name — small grey text: `"Added by Julia"`.
-
----
-
-## Priority 4 — Expenses tab (full feature)
-
-The Expenses tab (`src/app/expenses/page.tsx`) is currently a placeholder. See `docs/SPECIFICATION.md` backlog for full scope.
-
----
-
-## Priority 5 — Parent-only category filtering in Pantry
-
-In `src/app/page.tsx`:
-```ts
-const PARENT_ONLY_CATEGORIES: Category[] = [] // populate when alcohol/tobacco categories are added
-const visibleCategories = profile?.role === 'parent'
-  ? CATEGORIES
-  : CATEGORIES.filter(c => !PARENT_ONLY_CATEGORIES.includes(c.value))
-```
-
-Note: current 7 categories don't include alcohol/tobacco — add them first or defer.
+User wants a Transport expense category. Architecture is ready (`CATEGORIES` array in `src/lib/categories.ts`). Hold off until core is stable. When adding: update `categories.ts` and the receipt import system prompt.
 
 ---
 
 ## Architecture decisions (do not revisit)
 
-- **No `@supabase/ssr`** — all pages are Client Components; client-side auth with localStorage is correct for this app
+- **No `@supabase/ssr`** — all pages are Client Components; client-side auth with localStorage is correct
 - **No middleware** — route guard handled by `AuthShell` client component
 - **`detectSessionInUrl: false`** — avoids iOS Safari hash-change reload bug
-- **`lock: async (_name, _acquireTimeout, fn) => fn()`** — bypass `navigator.locks` in Supabase client; safe for single-device personal app; prevents 5s hangs in dev from HMR
-- **`React.FormEvent` deprecated in React 19** — all form handlers use `onSubmit={e => { e.preventDefault(); void submit() }}`
-- **`flex flex-col min-h-full` + `sticky bottom-0`** — shopping page button pinning; do not change to nested overflow containers (caused iOS bug)
-- **Profile sheet uses z-50, backdrop z-40** — do not change z-index layering
-- **Plain INSERT (not upsert) in setup** — upsert triggers a SELECT which hits RLS; plain INSERT only checks INSERT policy; 23505 on retry = profile already exists, treat as success
-- **`get_my_household_id()` SECURITY DEFINER** — all policies that need the user's household should use this function, never an inline `SELECT household_id FROM profiles WHERE user_id = auth.uid()` (that pattern causes infinite recursion on the profiles table)
+- **`lock: async (_name, _acquireTimeout, fn) => fn()`** — bypasses `navigator.locks`; prevents 5s dev hangs
+- **Plain INSERT (not upsert) in setup** — upsert triggers a SELECT which hits RLS; plain INSERT only checks INSERT policy
+- **`get_my_household_id()` SECURITY DEFINER** — all RLS policies that scope by household use this function; never use inline `SELECT household_id FROM profiles WHERE user_id = auth.uid()` — causes infinite recursion (42P17)
+- **`shoppingNames` Set** — pantry expiry alert uses Set of active shopping item names fetched from DB; always in sync; never re-shows if item is on the list
+- **Immediate DB delete** — shopping items deleted from DB on ✕; undo re-inserts a fresh row; avoids unmount race condition
+- **`max_tokens: 8096`** — receipt parser needs this for large PDFs; do not lower
+- **Receipt import 4 steps** — input → parsing → review → expense; expense step always pre-fills per-category amounts from AI prices
+
+---
+
+## Key files quick reference
+
+| File | Purpose |
+|------|---------|
+| `src/lib/categories.ts` | Shared `Category` type + `CATEGORIES` array (7 categories) |
+| `src/lib/supabase.ts` | Supabase client singleton |
+| `src/contexts/AuthContext.tsx` | Auth state, profile, `useAuth()` hook |
+| `src/components/AuthShell.tsx` | Route guard + layout wrapper |
+| `src/components/BottomNav.tsx` | 4-tab bottom navigation |
+| `src/components/ProfileSheet.tsx` | Avatar → slide-up sheet with members, role editing, sign out |
+| `src/components/AddPantryItemModal.tsx` | Add / edit pantry item |
+| `src/components/AddShoppingItemModal.tsx` | Add shopping item |
+| `src/components/AddExpenseModal.tsx` | Manual expense entry |
+| `src/components/ImportReceiptModal.tsx` | Receipt → pantry + expense (4 steps) |
+| `src/app/page.tsx` | Pantry tab |
+| `src/app/shopping/page.tsx` | Shopping list tab |
+| `src/app/expenses/page.tsx` | Expenses tab |
+| `src/app/menu/page.tsx` | Meal planner tab (placeholder) |
+| `src/app/api/parse-receipt/route.ts` | Anthropic API route for receipt parsing |
+| `src/app/join/page.tsx` | Invite link landing + signup |
+| `src/app/setup/page.tsx` | Post-signup setup (display name + household) |
+
+---
+
+## DB tables
+
+| Table | Key columns | RLS |
+|-------|-------------|-----|
+| `households` | `id`, `name`, `invite_code` | — |
+| `profiles` | `user_id`, `household_id`, `display_name`, `role` | Scoped to own household via `get_my_household_id()` |
+| `pantry_items` | `household_id`, `name`, `category`, `quantity`, `unit`, `expiry_date`, `added_by` | Scoped to household |
+| `shopping_items` | `household_id`, `name`, `quantity`, `store`, `is_ticked`, `added_by` | Scoped to household |
+| `expenses` | `household_id`, `amount`, `category`, `store`, `note`, `date`, `added_by` | Scoped to household |
 
 ---
 
 ## Tech stack
 
-- Next.js (App Router) — read `node_modules/next/dist/docs/` before writing any Next.js code
+- Next.js (App Router) — **read `node_modules/next/dist/docs/` before writing any Next.js code**
 - React 19.2.4
 - Supabase `@supabase/supabase-js ^2.106.2`
 - Tailwind CSS v4
 - TypeScript (strict)
-- Anthropic SDK (receipt parsing API route only)
+- Anthropic SDK (receipt parsing only; model: `claude-opus-4-7`)
+- Deployed on Vercel — auto-deploy from `main` at https://github.com/JuliaBulg/family-hub.git
