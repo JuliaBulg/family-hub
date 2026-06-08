@@ -18,7 +18,6 @@ export default function ShoppingPage() {
   const [showModal, setShowModal]       = useState(false)
   const [pendingDelete, setPendingDelete] = useState<ShoppingItem | null>(null)
   const undoTimerRef                    = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const pendingDeleteRef                = useRef<ShoppingItem | null>(null)
 
   const fetchItems = useCallback(async () => {
     const { data } = await supabase
@@ -30,16 +29,6 @@ export default function ShoppingPage() {
 
   useEffect(() => { fetchItems() }, [fetchItems])
 
-  // Commit any pending delete immediately when navigating away
-  useEffect(() => {
-    return () => {
-      if (pendingDeleteRef.current) {
-        if (undoTimerRef.current) clearTimeout(undoTimerRef.current)
-        void supabase.from('shopping_items').delete().eq('id', pendingDeleteRef.current.id)
-      }
-    }
-  }, [])
-
   async function toggleChecked(item: ShoppingItem) {
     await supabase.from('shopping_items').update({ is_ticked: !item.is_ticked }).eq('id', item.id)
     setItems((prev) => prev.map((i) => i.id === item.id ? { ...i, is_ticked: !i.is_ticked } : i))
@@ -47,25 +36,24 @@ export default function ShoppingPage() {
 
   function deleteItem(item: ShoppingItem) {
     if (undoTimerRef.current) clearTimeout(undoTimerRef.current)
-    if (pendingDelete) {
-      void supabase.from('shopping_items').delete().eq('id', pendingDelete.id)
-    }
+    void supabase.from('shopping_items').delete().eq('id', item.id)
     setItems(prev => prev.filter(i => i.id !== item.id))
     setPendingDelete(item)
-    pendingDeleteRef.current = item
-    undoTimerRef.current = setTimeout(() => {
-      void supabase.from('shopping_items').delete().eq('id', item.id)
-      setPendingDelete(null)
-      pendingDeleteRef.current = null
-    }, 6000)
+    undoTimerRef.current = setTimeout(() => setPendingDelete(null), 6000)
   }
 
-  function undoDelete() {
+  async function undoDelete() {
     if (!pendingDelete) return
     if (undoTimerRef.current) clearTimeout(undoTimerRef.current)
-    setItems(prev => [...prev, pendingDelete])
+    const { data } = await supabase.from('shopping_items').insert({
+      name: pendingDelete.name,
+      quantity: pendingDelete.quantity,
+      store: pendingDelete.store,
+      is_ticked: pendingDelete.is_ticked,
+      added_by: pendingDelete.added_by,
+    }).select().single()
+    if (data) setItems(prev => [...prev, data as ShoppingItem])
     setPendingDelete(null)
-    pendingDeleteRef.current = null
   }
 
   async function clearDone() {
