@@ -61,13 +61,8 @@ const [showModal, setShowModal]                 = useState(false)
   const [expandedCategory, setExpandedCategory]     = useState<Category | null>(null)
   const [expiredExpanded, setExpiredExpanded]           = useState(false)
   const [expiringSoonExpanded, setExpiringSoonExpanded] = useState(false)
-  const [recentlySent, setRecentlySent]                 = useState<Set<string>>(new Set())
-  const [dismissedFromAlert, setDismissedFromAlert]     = useState<Set<string>>(() => {
-    try {
-      const stored = localStorage.getItem('dismissed_expiry_alerts')
-      return stored ? new Set<string>(JSON.parse(stored) as string[]) : new Set<string>()
-    } catch { return new Set<string>() }
-  })
+  const [recentlySent, setRecentlySent]   = useState<Set<string>>(new Set())
+  const [shoppingNames, setShoppingNames] = useState<Set<string>>(new Set())
 
   const fetchItems = useCallback(async () => {
     const { data } = await supabase
@@ -77,7 +72,13 @@ const [showModal, setShowModal]                 = useState(false)
     setItems(data ?? [])
   }, [])
 
+  const fetchShoppingNames = useCallback(async () => {
+    const { data } = await supabase.from('shopping_items').select('name').eq('is_ticked', false)
+    setShoppingNames(new Set((data ?? []).map(i => i.name.toLowerCase())))
+  }, [])
+
   useEffect(() => { fetchItems() }, [fetchItems])
+  useEffect(() => { fetchShoppingNames() }, [fetchShoppingNames])
 
   async function deleteGroup(ids: string[]) {
     await supabase.from('pantry_items').delete().in('id', ids)
@@ -114,17 +115,12 @@ const [showModal, setShowModal]                 = useState(false)
       added_by: profile?.display_name,
     })
     if (error) { console.error('sendExpiringSoonGroup:', error); return }
-    const ids = group.map(i => i.id)
-    setDismissedFromAlert(prev => {
-      const next = new Set([...prev, ...ids])
-      localStorage.setItem('dismissed_expiry_alerts', JSON.stringify([...next]))
-      return next
-    })
+    setShoppingNames(prev => new Set([...prev, key.toLowerCase()]))
     setRecentlySent(prev => new Set([...prev, key]))
     setTimeout(() => setRecentlySent(prev => { const s = new Set(prev); s.delete(key); return s }), 2000)
   }
 
-  const expiringSoon = items.filter(i => isExpiringSoon(i.expiry_date) && !dismissedFromAlert.has(i.id))
+  const expiringSoon = items.filter(i => isExpiringSoon(i.expiry_date) && !shoppingNames.has(i.name.toLowerCase()))
   const expired      = items.filter(i => isExpired(i.expiry_date))
 
   return (
@@ -261,7 +257,7 @@ const [showModal, setShowModal]                 = useState(false)
                     {groups.map((group) => {
                       const anyExpired = group.some(i => isExpired(i.expiry_date))
                       const anySoon    = group.some(i => isExpiringSoon(i.expiry_date))
-                      const onList     = group.some(i => dismissedFromAlert.has(i.id))
+                      const onList     = group.some(i => shoppingNames.has(i.name.toLowerCase()))
                       const qty        = groupQuantity(group)
                       const ids        = group.map(i => i.id)
                       return (
