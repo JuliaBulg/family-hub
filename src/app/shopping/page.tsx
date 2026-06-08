@@ -18,6 +18,7 @@ export default function ShoppingPage() {
   const [showModal, setShowModal]       = useState(false)
   const [pendingDelete, setPendingDelete] = useState<ShoppingItem | null>(null)
   const undoTimerRef                    = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const pendingDeleteRef                = useRef<ShoppingItem | null>(null)
 
   const fetchItems = useCallback(async () => {
     const { data } = await supabase
@@ -28,6 +29,16 @@ export default function ShoppingPage() {
   }, [])
 
   useEffect(() => { fetchItems() }, [fetchItems])
+
+  // Commit any pending delete immediately when navigating away
+  useEffect(() => {
+    return () => {
+      if (pendingDeleteRef.current) {
+        if (undoTimerRef.current) clearTimeout(undoTimerRef.current)
+        void supabase.from('shopping_items').delete().eq('id', pendingDeleteRef.current.id)
+      }
+    }
+  }, [])
 
   async function toggleChecked(item: ShoppingItem) {
     await supabase.from('shopping_items').update({ is_ticked: !item.is_ticked }).eq('id', item.id)
@@ -41,9 +52,11 @@ export default function ShoppingPage() {
     }
     setItems(prev => prev.filter(i => i.id !== item.id))
     setPendingDelete(item)
+    pendingDeleteRef.current = item
     undoTimerRef.current = setTimeout(() => {
       void supabase.from('shopping_items').delete().eq('id', item.id)
       setPendingDelete(null)
+      pendingDeleteRef.current = null
     }, 6000)
   }
 
@@ -52,6 +65,7 @@ export default function ShoppingPage() {
     if (undoTimerRef.current) clearTimeout(undoTimerRef.current)
     setItems(prev => [...prev, pendingDelete])
     setPendingDelete(null)
+    pendingDeleteRef.current = null
   }
 
   async function clearDone() {
