@@ -4,6 +4,9 @@ import { useEffect, useState, useCallback, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 import AddShoppingItemModal from '@/components/AddShoppingItemModal'
 
+// Survives component unmount — prevents deleted items reappearing during navigation
+const deletedIds = new Set<string>()
+
 interface ShoppingItem {
   id: string
   name: string
@@ -24,7 +27,7 @@ export default function ShoppingPage() {
       .from('shopping_items')
       .select('*')
       .order('created_at', { ascending: true })
-    setItems(data ?? [])
+    setItems((data ?? []).filter(i => !deletedIds.has(i.id)))
   }, [])
 
   useEffect(() => { fetchItems() }, [fetchItems])
@@ -36,7 +39,10 @@ export default function ShoppingPage() {
 
   function deleteItem(item: ShoppingItem) {
     if (undoTimerRef.current) clearTimeout(undoTimerRef.current)
-    void supabase.from('shopping_items').delete().eq('id', item.id)
+    deletedIds.add(item.id)
+    void supabase.from('shopping_items').delete().eq('id', item.id).then(() => {
+      deletedIds.delete(item.id)
+    })
     setItems(prev => prev.filter(i => i.id !== item.id))
     setPendingDelete(item)
     undoTimerRef.current = setTimeout(() => setPendingDelete(null), 6000)
@@ -45,6 +51,7 @@ export default function ShoppingPage() {
   async function undoDelete() {
     if (!pendingDelete) return
     if (undoTimerRef.current) clearTimeout(undoTimerRef.current)
+    deletedIds.delete(pendingDelete.id)
     const { data } = await supabase.from('shopping_items').insert({
       name: pendingDelete.name,
       quantity: pendingDelete.quantity,
