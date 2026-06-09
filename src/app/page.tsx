@@ -64,6 +64,7 @@ const [showModal, setShowModal]                 = useState(false)
   const [expiringSoonExpanded, setExpiringSoonExpanded] = useState(false)
   const [recentlySent, setRecentlySent]   = useState<Set<string>>(new Set())
   const [shoppingNames, setShoppingNames] = useState<Set<string>>(new Set())
+  const [search, setSearch]               = useState('')
 
   const fetchItems = useCallback(async () => {
     const { data } = await supabase
@@ -124,8 +125,12 @@ const [showModal, setShowModal]                 = useState(false)
     setTimeout(() => setRecentlySent(prev => { const s = new Set(prev); s.delete(key); return s }), 2000)
   }
 
-  const expiringSoon = items.filter(i => isExpiringSoon(i.expiry_date) && !i.shopping_alert_dismissed)
-  const expired      = items.filter(i => isExpired(i.expiry_date) && !i.shopping_alert_dismissed)
+  const expiringSoon   = items.filter(i => isExpiringSoon(i.expiry_date) && !i.shopping_alert_dismissed)
+  const expired        = items.filter(i => isExpired(i.expiry_date) && !i.shopping_alert_dismissed)
+  const searchTerm     = search.trim().toLowerCase()
+  const searchResults  = searchTerm
+    ? groupByName(items.filter(i => i.name.toLowerCase().includes(searchTerm)))
+    : []
 
   return (
     <div className="px-4 pt-3">
@@ -137,6 +142,79 @@ const [showModal, setShowModal]                 = useState(false)
         </p>
       </div>
 
+      {/* Search */}
+      <div className="relative mb-3">
+        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">🔍</span>
+        <input
+          type="text"
+          placeholder="Search pantry…"
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          className="w-full pl-8 pr-8 py-2 bg-white border border-slate-200 rounded-xl text-sm text-slate-700 placeholder-slate-400 focus:outline-none focus:border-emerald-400"
+        />
+        {search && (
+          <button
+            onClick={() => setSearch('')}
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+          >
+            ✕
+          </button>
+        )}
+      </div>
+
+      {/* Search results */}
+      {searchTerm ? (
+        <div className="space-y-1 mb-3">
+          {searchResults.length === 0 ? (
+            <div className="text-center py-10 text-slate-400">
+              <p className="text-3xl mb-2">🔍</p>
+              <p className="text-sm">No items found for &ldquo;{search.trim()}&rdquo;</p>
+            </div>
+          ) : (
+            <>
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">
+                {searchResults.length} result{searchResults.length !== 1 ? 's' : ''}
+              </p>
+              {searchResults.map(group => {
+                const cat        = CATEGORIES.find(c => c.value === group[0].category)
+                const anyExpired = group.some(i => isExpired(i.expiry_date))
+                const anySoon    = group.some(i => isExpiringSoon(i.expiry_date))
+                const onList     = group.some(i => shoppingNames.has(i.name.toLowerCase()))
+                const wasOnList  = !onList && group.some(i => i.shopping_alert_dismissed)
+                const qty        = groupQuantity(group)
+                const ids        = group.map(i => i.id)
+                return (
+                  <div
+                    key={group[0].id}
+                    className={`flex items-center gap-3 px-4 py-3 bg-white border rounded-xl ${
+                      anyExpired ? 'border-red-200' : anySoon ? 'border-amber-200' : 'border-slate-100'
+                    }`}
+                  >
+                    <span className="text-lg flex-shrink-0">{cat?.emoji}</span>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-slate-700">{group[0].name}</p>
+                      <p className="text-xs text-slate-400">
+                        {qty}
+                        {anyExpired && <span className="text-red-500"> · 🚨 Expired</span>}
+                        {!anyExpired && anySoon && (
+                          <span className="text-amber-500">
+                            {' · ⏰ Expiring soon'}
+                            {onList    && ' · 🛒 On list'}
+                            {wasOnList && ' · ✓ Was on list'}
+                          </span>
+                        )}
+                      </p>
+                    </div>
+                    <button onClick={() => setEditItem(group[0])} className="text-slate-300 hover:text-slate-500 text-base transition-colors px-1">✏️</button>
+                    <button onClick={() => deleteGroup(ids)} className="text-slate-300 hover:text-red-400 text-lg transition-colors">✕</button>
+                  </div>
+                )
+              })}
+            </>
+          )}
+        </div>
+      ) : (
+        <>
       {/* Expiry alerts */}
       {expired.length > 0 && (
         <div className="mb-2 bg-red-50 border border-red-200 rounded-xl overflow-hidden">
@@ -315,6 +393,8 @@ const [showModal, setShowModal]                 = useState(false)
           })
         }
       </div>
+        </>
+      )}
 
       {/* Buttons */}
       <div className="flex gap-3 pb-4">
