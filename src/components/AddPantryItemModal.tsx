@@ -54,13 +54,32 @@ export default function AddPantryItemModal({ onClose, onAdded, editItem }: Props
       expiry_date: expiryDate || null,
     }
 
-    const { error: dbErr } = editItem
-      ? await supabase.from('pantry_items').update(payload).eq('id', editItem.id)
-      : await supabase.from('pantry_items').insert({
-          ...payload,
-          household_id: profile?.household_id,
-          added_by: profile?.display_name,
-        })
+    let dbErr = null
+
+    if (editItem) {
+      const result = await supabase.from('pantry_items').update(payload).eq('id', editItem.id)
+      dbErr = result.error
+    } else {
+      const { data } = payload.expiry_date === null
+        ? await supabase.from('pantry_items').select('id, quantity, unit').ilike('name', payload.name).eq('category', payload.category).is('expiry_date', null).limit(1)
+        : await supabase.from('pantry_items').select('id, quantity, unit').ilike('name', payload.name).eq('category', payload.category).eq('expiry_date', payload.expiry_date).limit(1)
+
+      const existing = data?.[0]
+      if (existing) {
+        const eQty = parseFloat(existing.quantity ?? 'NaN')
+        const nQty = parseFloat(payload.quantity ?? 'NaN')
+        if (!isNaN(eQty) && !isNaN(nQty) && existing.unit === payload.unit) {
+          const result = await supabase.from('pantry_items').update({ quantity: String(eQty + nQty) }).eq('id', existing.id)
+          dbErr = result.error
+        } else {
+          const result = await supabase.from('pantry_items').insert({ ...payload, household_id: profile?.household_id, added_by: profile?.display_name })
+          dbErr = result.error
+        }
+      } else {
+        const result = await supabase.from('pantry_items').insert({ ...payload, household_id: profile?.household_id, added_by: profile?.display_name })
+        dbErr = result.error
+      }
+    }
 
     setLoading(false)
     if (dbErr) { setError('Something went wrong. Please try again.'); return }

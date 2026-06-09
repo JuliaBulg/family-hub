@@ -11,9 +11,10 @@ For each item return:
 - quantity: numeric amount as a string if visible, otherwise null
 - unit: unit like "g", "kg", "L", "ml", "pcs", "bottle", "pack" — or null
 - price: the total line price for this item as a number (not unit price), or null if not visible
+- estimated_expiry_days: integer — estimated days from purchase until the item typically expires when refrigerated. Use these EU averages: milk 7, chicken/poultry 2, raw beef/pork/mince 3, vegetables 5, yogurt/kefir 14, hard cheese (cheddar/gouda) 21, soft cheese (mozzarella/brie/cream cheese/feta) 7, eggs 21, bread 5. For canned goods, dry pasta, rice, cleaning products, cosmetics, and other non-perishables return null.
 
 Return ONLY valid JSON, no other text:
-{"items":[{"name":"Pasta","category":"food","quantity":"500","unit":"g","price":1.29}]}`
+{"items":[{"name":"Pasta","category":"food","quantity":"500","unit":"g","price":1.29,"estimated_expiry_days":null}]}`
 
 export async function POST(req: NextRequest) {
   const body = await req.json()

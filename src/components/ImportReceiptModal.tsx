@@ -14,6 +14,7 @@ interface ParsedItem {
   quantity: string | null
   unit: string | null
   price: number | null
+  estimated_expiry_days: number | null
 }
 
 interface Props {
@@ -84,6 +85,7 @@ export default function ImportReceiptModal({ onClose, onAdded }: Props) {
         quantity: i.quantity ?? null,
         unit: i.unit ?? null,
         price: typeof i.price === 'number' ? i.price : null,
+        estimated_expiry_days: typeof i.estimated_expiry_days === 'number' ? i.estimated_expiry_days : null,
       }))
       setParsedItems(items)
       setSelected(new Set(items.map((_, idx) => idx)))
@@ -114,19 +116,49 @@ export default function ImportReceiptModal({ onClose, onAdded }: Props) {
     const toAdd = parsedItems.filter((_, idx) => selected.has(idx))
     if (toAdd.length === 0) return
     setSaving(true)
-    const { error: dbError } = await supabase.from('pantry_items').insert(
-      toAdd.map(item => ({
-        name: item.name.trim(),
+
+    const today = new Date()
+    let insertError: string | null = null
+
+    for (const item of toAdd) {
+      const expiryDate: string | null = (() => {
+        if (item.estimated_expiry_days == null) return null
+        const d = new Date(today)
+        d.setDate(d.getDate() + item.estimated_expiry_days)
+        return d.toISOString().split('T')[0]
+      })()
+
+      const trimmedName = item.name.trim()
+
+      const { data } = expiryDate === null
+        ? await supabase.from('pantry_items').select('id, quantity, unit').ilike('name', trimmedName).eq('category', item.category).is('expiry_date', null).limit(1)
+        : await supabase.from('pantry_items').select('id, quantity, unit').ilike('name', trimmedName).eq('category', item.category).eq('expiry_date', expiryDate).limit(1)
+
+      const existing = data?.[0]
+      if (existing) {
+        const eQty = parseFloat(existing.quantity ?? 'NaN')
+        const nQty = parseFloat(item.quantity ?? 'NaN')
+        if (!isNaN(eQty) && !isNaN(nQty) && existing.unit === item.unit) {
+          const { error } = await supabase.from('pantry_items').update({ quantity: String(eQty + nQty) }).eq('id', existing.id)
+          if (error) { insertError = error.message; break }
+          continue
+        }
+      }
+
+      const { error } = await supabase.from('pantry_items').insert({
+        name: trimmedName,
         category: item.category,
         quantity: item.quantity,
         unit: item.unit,
-        expiry_date: null,
+        expiry_date: expiryDate,
         household_id: profile?.household_id,
         added_by: profile?.display_name,
-      }))
-    )
+      })
+      if (error) { insertError = error.message; break }
+    }
+
     setSaving(false)
-    if (dbError) { setError('Could not save items. Please try again.'); return }
+    if (insertError) { setError('Could not save items. Please try again.'); return }
 
     // Build per-category totals from prices of selected items
     const totals: Partial<Record<Category, number>> = {}
