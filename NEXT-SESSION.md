@@ -1,26 +1,26 @@
 # Family Hub — Next Session Starting Point
 
 **Written:** 09-Jun-2026
-**Session status:** Session 6 complete. Expenses tab, receipt→expense import, PDF receipts, shopping delete fix, Vercel deployment. Live at https://family-hub-seven-sigma.vercel.app
+**Session status:** Session 7 complete. Live at https://family-hub-seven-sigma.vercel.app
 
 ---
 
-## What was built in session 6
+## What was built in session 7
 
 | What | Where | Notes |
 |------|-------|-------|
-| Added by label | `src/app/shopping/page.tsx` | Shows `by [Name]` under each shopping item |
-| Role editing | `src/components/ProfileSheet.tsx` | Parents can change any member's role (Parent ↔ Child) via buttons next to each member |
-| Join page role default | `src/app/join/page.tsx` | Default role is now `parent`; explicit two-button selector UI |
-| Shared categories | `src/lib/categories.ts` | Single source of truth for all 7 categories used by pantry, expenses, and receipt import |
-| Expenses tab | `src/app/expenses/page.tsx` | Month navigation, total card, category breakdown with progress bars, expandable rows |
-| Add Expense modal | `src/components/AddExpenseModal.tsx` | Amount, category grid, store, note, date fields; saves to `expenses` table |
-| Receipt → expense auto-log | `src/components/ImportReceiptModal.tsx` | Step 4: per-category amounts pre-filled from AI-extracted prices; one DB row per category |
-| PDF receipt support | `src/app/api/parse-receipt/route.ts` | Anthropic `document` content block; max_tokens raised to 8096 |
-| PDF UX polish | `src/components/ImportReceiptModal.tsx` | Blue card for PDF preview; "Large PDFs can take up to 30 seconds" message |
-| Expiry alert fix | `src/app/page.tsx` | `shoppingNames` Set fetched from DB; alert never re-shows if item is on shopping list |
-| Shopping delete fix | `src/app/shopping/page.tsx` | Immediate DB delete on ✕; undo re-inserts a fresh row — no reappearance on navigation |
-| Vercel deployment | — | Auto-deploys on push to `main` via https://github.com/JuliaBulg/family-hub.git |
+| Pantry search bar | `src/app/page.tsx` | Always visible; flat filtered list when searching; category emoji shown; ✕ to clear |
+| Persistent expiry alert dismissal | `src/app/page.tsx` + `pantry_items.shopping_alert_dismissed` | Once user sends item to shopping, alert never comes back — DB flag survives reload |
+| "Was on list" indicator | `src/app/page.tsx` | Items with `shopping_alert_dismissed = true` show `· ✓ Was on list` in pantry card |
+| Receipt expiry date estimation | `src/app/api/parse-receipt/route.ts` | AI estimates `expiry_date` per item using EU shelf-life averages baked into system prompt |
+| Quantity merging from receipt | `src/components/ImportReceiptModal.tsx` | Same name + category + expiry → quantities summed; else new row inserted |
+| Quantity merging on manual add | `src/components/AddPantryItemModal.tsx` | Same merge-or-insert logic for manual adds |
+| Shopping delete race condition fix | `src/app/shopping/page.tsx` | Module-level `deletedIds` Set (outside React component) survives unmount; deleted items never reappear on tab navigation |
+| Meal Planner Phase 1 | `src/app/menu/page.tsx` | Full week view (this + next week), today highlighted, add/edit/delete meals with slots + servings |
+| Add/Edit Meal modal | `src/components/AddMealModal.tsx` | NEW file: date picker, slot selector, meal name, servings stepper |
+| Cook Tonight AI modal | `src/components/CookTonightModal.tsx` | NEW file: servings picker + time presets + AI recipe suggestions |
+| Cook Tonight API route | `src/app/api/cook-tonight/route.ts` | NEW file: Claude Opus 4.7; accepts items + servings + maxMinutes; returns 3 suggestions |
+| Cooking time presets | `src/components/CookTonightModal.tsx` | ⚡ Quick ≤25 min · 🕐 Normal ≤45 min (default) · 🍲 No rush; labels show minutes |
 
 ---
 
@@ -29,85 +29,74 @@
 | Feature | Status | Notes |
 |---------|--------|-------|
 | Auth (signup, login, forgot password) | ✅ Working | PKCE flow, email confirmation |
-| Household creation | ✅ Working | /setup page |
-| Invite link (/join) | ✅ Working | `?code=` lookup, role selector, default parent |
-| Profile sheet | ✅ Working | Members list, role badges, parents can edit roles |
-| Pantry | ✅ Working | Categories, expiry alerts, cook tonight (placeholder) |
-| From Receipt (pantry) | ✅ Working | Image + PDF; adds to pantry AND logs expenses per category |
-| Shopping list | ✅ Working | Add, tick, delete (immediate + undo), "added by" label |
-| Expenses tab | ✅ Working | Month nav, total, category bars, expandable expense rows |
-| Add Expense modal | ✅ Working | Manual entry from Expenses tab |
-| Meal Planner | 🚧 Placeholder | Menu tab shows "coming soon" |
+| Household creation + invite link | ✅ Working | `/setup` + `/join?code=xxx` |
+| Profile sheet + role editing | ✅ Working | Parents can edit any member's role |
+| Pantry — full CRUD + search | ✅ Working | Categories, expiry alerts, search, cook tonight |
+| From Receipt (pantry + expenses) | ✅ Working | Image + PDF; quantity merging; expiry estimation; auto-logs expenses |
+| Shopping list | ✅ Working | Add, tick, delete + undo, "added by", expiry alert integration |
+| Expenses tab | ✅ Working | Month nav, total, category bars, expandable rows, manual add |
+| Meal Planner Phase 1 | ✅ Working | Week view, add/edit/delete meals, servings |
+| Cook Tonight AI | ✅ Working | Servings + time presets + 3 AI suggestions with ingredients |
+| Meal Planner Phase 2 | 🚧 Not started | See Priority 1 below |
 
 ---
 
-## Priority 1 — Husband's receipt upload issue (investigate first)
+## Priority 1 — Meal Planner Phase 2 (next major feature)
 
-The user mentioned their husband had a problem uploading a receipt. Not investigated yet. Likely causes:
-- PDF too large for Anthropic API (20MB limit)
-- Non-receipt document
-- Network timeout on mobile
+**Goal:** Close the loop between meal planning and pantry — so the app can alert about missing ingredients and deduct from pantry when a meal is cooked.
 
-Reproduce: have husband re-try. If it fails, get the exact error shown and check Vercel function logs.
+### Phase 2A — Pantry awareness while planning
 
----
+**Feature: Missing ingredient alert when adding a meal**
+When user adds a meal name, AI checks which pantry items are available. If key ingredients seem to be missing, show a badge or prompt: "You may need to buy: [item]". Tapping adds it to the shopping list.
 
-## Priority 2 — Meal Planner (next major feature)
+**Feature: Pantry reservation badge**
+When a meal is planned for a future date and the item is in the pantry, show a small badge on the pantry card: "Reserved for [Meal name] on [date]". Prevents the family from using ingredients already committed to a planned meal.
 
-The Meal Planner tab (`src/app/menu/page.tsx`) is a placeholder. Proposed scope:
-- View meals planned for the current week (Mon–Sun)
-- Add a meal to a day + slot (breakfast / lunch / dinner)
-- Delete a meal
-- "What can I cook tonight?" button on Pantry tab → AI suggestion from current pantry items (modal already wired up)
+### Phase 2B — Cook and deduct
 
-**DB tables needed:**
-```sql
-create table meal_plans (
-  id uuid primary key default gen_random_uuid(),
-  household_id uuid not null references households(id),
-  week_start date not null,
-  created_at timestamptz default now()
-);
+**Feature: Mark as Cooked**
+On the meal planner, each meal gets a "✅ Mark as cooked" button. Tapping it:
+1. Sets `cooked_at` timestamp on the `meals` row
+2. Opens a confirmation modal: "Deduct ingredients from pantry?" with a list of items to deduct
+3. User confirms → selected pantry items reduced in quantity (or deleted if quantity hits 0)
 
-create table meals (
-  id uuid primary key default gen_random_uuid(),
-  meal_plan_id uuid not null references meal_plans(id) on delete cascade,
-  day text not null,       -- 'mon', 'tue', etc.
-  slot text not null,      -- 'breakfast', 'lunch', 'dinner'
-  name text not null,
-  added_by text,
-  created_at timestamptz default now()
-);
-```
+**DB changes needed for Phase 2:**
+- `meals` table already has `cooked_at` column — no migration needed for that
+- May need a `meal_ingredients` table to store ingredient-to-pantry-item linkages (design decision to make at start of session)
+
+### Phase 2C — Shopping list integration
+
+**Feature: Add missing meal ingredients to shopping list**
+From the meal planner, a "🛒 Add missing" button per meal that:
+1. Checks which ingredients are not in the pantry (or have insufficient quantity for planned servings)
+2. Adds those ingredients to the shopping list in one tap
 
 ---
 
-## Priority 3 — Shopping list → Pantry loop
+## Priority 2 — Shopping → Pantry loop (deferred, revisit)
 
-When "Done shopping (N)" is tapped, offer to move ticked items into pantry. Reduces re-entry after a shopping trip.
+When "Done shopping" is tapped, offer to move ticked items into pantry. Risk: duplicates if user also imports a receipt. Design options:
+- (A) No auto-add — receipt import is the preferred loop
+- (B) "Add to pantry?" prompt after clearing done items, with duplicate check
+- (C) Smart dedup by name
 
-Flow: tap "Done shopping" → sheet shows ticked items with category picker → confirm → insert into `pantry_items`, delete from `shopping_items`.
-
----
-
-## Priority 4 — Transport / custom categories (future)
-
-User wants a Transport expense category. Architecture is ready (`CATEGORIES` array in `src/lib/categories.ts`). Hold off until core is stable. When adding: update `categories.ts` and the receipt import system prompt.
+Decision deferred — receipt import is the richer path (adds expiry dates + categories). Keep for discussion.
 
 ---
 
 ## Architecture decisions (do not revisit)
 
-- **No `@supabase/ssr`** — all pages are Client Components; client-side auth with localStorage is correct
-- **No middleware** — route guard handled by `AuthShell` client component
+- **No `@supabase/ssr`** — Client Components only; client-side auth with localStorage
+- **No middleware** — route guard via `AuthShell` client component
 - **`detectSessionInUrl: false`** — avoids iOS Safari hash-change reload bug
 - **`lock: async (_name, _acquireTimeout, fn) => fn()`** — bypasses `navigator.locks`; prevents 5s dev hangs
-- **Plain INSERT (not upsert) in setup** — upsert triggers a SELECT which hits RLS; plain INSERT only checks INSERT policy
-- **`get_my_household_id()` SECURITY DEFINER** — all RLS policies that scope by household use this function; never use inline `SELECT household_id FROM profiles WHERE user_id = auth.uid()` — causes infinite recursion (42P17)
-- **`shoppingNames` Set** — pantry expiry alert uses Set of active shopping item names fetched from DB; always in sync; never re-shows if item is on the list
-- **Immediate DB delete** — shopping items deleted from DB on ✕; undo re-inserts a fresh row; avoids unmount race condition
-- **`max_tokens: 8096`** — receipt parser needs this for large PDFs; do not lower
-- **Receipt import 4 steps** — input → parsing → review → expense; expense step always pre-fills per-category amounts from AI prices
+- **`get_my_household_id()` SECURITY DEFINER** — all RLS policies use this function; never use inline `SELECT household_id FROM profiles` — causes 42P17 infinite recursion
+- **Module-level `deletedIds` Set** — outside React component; survives unmount; prevents reappearance of deleted shopping items
+- **`shopping_alert_dismissed` DB flag** — permanent; never auto-reset; only way to suppress expiry alerts
+- **Merge-or-insert** — both receipt import and manual add check for existing row (same name + category + expiry_date) before inserting; `.ilike()` for name, `.is('expiry_date', null)` vs `.eq('expiry_date', date)` for null-safe expiry
+- **`max_tokens: 8096`** — receipt parser; do not lower
+- **Cook Tonight: `claude-opus-4-7`, max_tokens: 1024**
 
 ---
 
@@ -120,39 +109,41 @@ User wants a Transport expense category. Architecture is ready (`CATEGORIES` arr
 | `src/contexts/AuthContext.tsx` | Auth state, profile, `useAuth()` hook |
 | `src/components/AuthShell.tsx` | Route guard + layout wrapper |
 | `src/components/BottomNav.tsx` | 4-tab bottom navigation |
-| `src/components/ProfileSheet.tsx` | Avatar → slide-up sheet with members, role editing, sign out |
-| `src/components/AddPantryItemModal.tsx` | Add / edit pantry item |
+| `src/components/ProfileSheet.tsx` | Avatar sheet — members, role editing, sign out |
+| `src/components/AddPantryItemModal.tsx` | Add / edit pantry item (with merge-or-insert) |
 | `src/components/AddShoppingItemModal.tsx` | Add shopping item |
 | `src/components/AddExpenseModal.tsx` | Manual expense entry |
-| `src/components/ImportReceiptModal.tsx` | Receipt → pantry + expense (4 steps) |
-| `src/app/page.tsx` | Pantry tab |
-| `src/app/shopping/page.tsx` | Shopping list tab |
+| `src/components/ImportReceiptModal.tsx` | Receipt → pantry + expense (4 steps, quantity merging, expiry estimation) |
+| `src/components/AddMealModal.tsx` | Add / edit meal (meal planner) |
+| `src/components/CookTonightModal.tsx` | Cook Tonight modal — servings + time presets + AI suggestions |
+| `src/app/page.tsx` | Pantry tab — search, expiry alerts, dismissal logic |
+| `src/app/shopping/page.tsx` | Shopping list — delete race condition fix |
+| `src/app/menu/page.tsx` | Meal planner — week view, add/edit/delete |
 | `src/app/expenses/page.tsx` | Expenses tab |
-| `src/app/menu/page.tsx` | Meal planner tab (placeholder) |
-| `src/app/api/parse-receipt/route.ts` | Anthropic API route for receipt parsing |
-| `src/app/join/page.tsx` | Invite link landing + signup |
-| `src/app/setup/page.tsx` | Post-signup setup (display name + household) |
+| `src/app/api/parse-receipt/route.ts` | Claude receipt parsing — EU shelf-life table in system prompt |
+| `src/app/api/cook-tonight/route.ts` | Claude recipe suggestions — accepts items, servings, maxMinutes |
 
 ---
 
-## DB tables
+## DB tables (current)
 
-| Table | Key columns | RLS |
-|-------|-------------|-----|
-| `households` | `id`, `name`, `invite_code` | — |
-| `profiles` | `user_id`, `household_id`, `display_name`, `role` | Scoped to own household via `get_my_household_id()` |
-| `pantry_items` | `household_id`, `name`, `category`, `quantity`, `unit`, `expiry_date`, `added_by` | Scoped to household |
-| `shopping_items` | `household_id`, `name`, `quantity`, `store`, `is_ticked`, `added_by` | Scoped to household |
-| `expenses` | `household_id`, `amount`, `category`, `store`, `note`, `date`, `added_by` | Scoped to household |
+| Table | Key columns | Notes |
+|-------|-------------|-------|
+| `households` | `id`, `name`, `invite_code` | |
+| `profiles` | `user_id`, `household_id`, `display_name`, `role` | RLS via `get_my_household_id()` |
+| `pantry_items` | `household_id`, `name`, `category`, `quantity`, `unit`, `expiry_date`, `shopping_alert_dismissed`, `added_by` | `shopping_alert_dismissed` added session 7 |
+| `shopping_items` | `household_id`, `name`, `quantity`, `checked`, `added_by` | |
+| `expenses` | `household_id`, `amount`, `category`, `store`, `note`, `date`, `added_by` | |
+| `meals` | `household_id`, `date`, `slot`, `name`, `servings`, `added_by`, `cooked_at` | Added session 7 |
 
 ---
 
 ## Tech stack
 
-- Next.js (App Router) — **read `node_modules/next/dist/docs/` before writing any Next.js code**
+- Next.js 16 (App Router, Turbopack) — **read `node_modules/next/dist/docs/` before writing any Next.js code**
 - React 19.2.4
 - Supabase `@supabase/supabase-js ^2.106.2`
 - Tailwind CSS v4
 - TypeScript (strict)
-- Anthropic SDK (receipt parsing only; model: `claude-opus-4-7`)
-- Deployed on Vercel — auto-deploy from `main` at https://github.com/JuliaBulg/family-hub.git
+- Anthropic SDK — `claude-opus-4-7` for receipts + cook tonight
+- Vercel — auto-deploy from `main` at https://github.com/JuliaBulg/family-hub.git
