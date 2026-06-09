@@ -1,48 +1,181 @@
-// Menu Planner tab
+'use client'
 
-const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+import { useEffect, useState, useCallback } from 'react'
+import { supabase } from '@/lib/supabase'
+import AddMealModal from '@/components/AddMealModal'
+
+type Slot = 'breakfast' | 'lunch' | 'dinner'
+
+interface Meal {
+  id: string
+  date: string
+  slot: Slot
+  name: string
+  servings: number
+  cooked_at: string | null
+  added_by: string | null
+}
+
+const SLOT_ORDER: Record<Slot, number> = { breakfast: 0, lunch: 1, dinner: 2 }
+const SLOT_EMOJI: Record<Slot, string> = { breakfast: '🌅', lunch: '☀️', dinner: '🌙' }
+
+function getWeekDays(offset: number): Date[] {
+  const today = new Date()
+  const day   = today.getDay()
+  const diff  = day === 0 ? -6 : 1 - day
+  const monday = new Date(today)
+  monday.setDate(today.getDate() + diff + offset * 7)
+  monday.setHours(0, 0, 0, 0)
+  return Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(monday)
+    d.setDate(monday.getDate() + i)
+    return d
+  })
+}
+
+function toDateStr(date: Date): string {
+  return date.toISOString().split('T')[0]
+}
+
+function isToday(date: Date): boolean {
+  return toDateStr(date) === toDateStr(new Date())
+}
 
 export default function MenuPage() {
+  const [weekOffset, setWeekOffset]       = useState(0)
+  const [meals, setMeals]                 = useState<Meal[]>([])
+  const [addingForDate, setAddingForDate] = useState<string | null>(null)
+  const [editMeal, setEditMeal]           = useState<Meal | null>(null)
+
+  const fetchMeals = useCallback(async () => {
+    const days = getWeekDays(weekOffset)
+    const from = toDateStr(days[0])
+    const to   = toDateStr(days[6])
+    const { data } = await supabase
+      .from('meals')
+      .select('*')
+      .gte('date', from)
+      .lte('date', to)
+    setMeals(data ?? [])
+  }, [weekOffset])
+
+  useEffect(() => { fetchMeals() }, [fetchMeals])
+
+  async function deleteMeal(id: string) {
+    await supabase.from('meals').delete().eq('id', id)
+    setMeals(prev => prev.filter(m => m.id !== id))
+  }
+
+  const days      = getWeekDays(weekOffset)
+  const weekLabel = weekOffset === 0 ? 'This Week' : 'Next Week'
+  const weekRange = `${days[0].toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })} – ${days[6].toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}`
+
   return (
-    <div className="px-4 pt-6">
-      {/* Header */}
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-slate-800">🍽️ Menu Planner</h1>
-        <p className="text-slate-500 text-sm mt-0.5">This week's meals</p>
-      </div>
+    <div className="flex flex-col min-h-full">
+      <div className="flex-1 px-4 pt-4 pb-4">
 
-      {/* Weekly plan */}
-      <div className="space-y-2">
-        {DAYS.map((day, i) => (
-          <div
-            key={day}
-            className="flex items-center gap-3 p-3.5 bg-white border border-slate-100 rounded-2xl shadow-sm"
+        {/* Header + week navigation */}
+        <div className="flex items-center justify-between mb-4">
+          <button
+            onClick={() => { setWeekOffset(0); setMeals([]) }}
+            disabled={weekOffset === 0}
+            className="w-9 h-9 flex items-center justify-center rounded-full bg-slate-100 text-slate-600 text-lg hover:bg-slate-200 disabled:opacity-30 transition-colors"
           >
-            <div className="w-10 text-center">
-              <p className="text-xs text-slate-400 font-medium">{day.slice(0, 3).toUpperCase()}</p>
-              <p className="text-lg font-bold text-slate-700">{i + 1}</p>
-            </div>
-            <div className="flex-1">
-              <p className="text-slate-400 text-sm italic">No meal planned</p>
-            </div>
-            <button className="text-emerald-500 text-xl font-light">+</button>
+            ‹
+          </button>
+          <div className="text-center">
+            <h1 className="text-base font-semibold text-slate-800">{weekLabel}</h1>
+            <p className="text-xs text-slate-400">{weekRange}</p>
           </div>
-        ))}
-      </div>
+          <button
+            onClick={() => { setWeekOffset(1); setMeals([]) }}
+            disabled={weekOffset === 1}
+            className="w-9 h-9 flex items-center justify-center rounded-full bg-slate-100 text-slate-600 text-lg hover:bg-slate-200 disabled:opacity-30 transition-colors"
+          >
+            ›
+          </button>
+        </div>
 
-      {/* Sunday planning button */}
-      <button className="mt-6 w-full py-4 bg-emerald-500 hover:bg-emerald-600 active:bg-emerald-700 text-white font-semibold rounded-2xl text-base transition-colors shadow-sm">
-        ✨ Plan This Week for Me
-      </button>
+        {/* Day cards */}
+        <div className="space-y-2">
+          {days.map(day => {
+            const dateStr  = toDateStr(day)
+            const today    = isToday(day)
+            const dayMeals = meals
+              .filter(m => m.date === dateStr)
+              .sort((a, b) => SLOT_ORDER[a.slot] - SLOT_ORDER[b.slot])
 
-      {/* Recipe hint */}
-      <div className="mt-4 p-4 bg-orange-50 border border-orange-200 rounded-2xl flex gap-3">
-        <span className="text-2xl">📖</span>
-        <div>
-          <p className="font-semibold text-orange-800 text-sm">11 family favourites ready</p>
-          <p className="text-orange-600 text-xs mt-0.5">Claude will suggest meals based on your pantry</p>
+            return (
+              <div
+                key={dateStr}
+                className={`rounded-2xl border overflow-hidden ${
+                  today ? 'border-emerald-300 bg-emerald-50/40' : 'border-slate-100 bg-white'
+                }`}
+              >
+                {/* Day header */}
+                <div className="flex items-center justify-between px-4 py-2.5">
+                  <div className="flex items-center gap-2">
+                    <p className={`text-sm font-semibold ${today ? 'text-emerald-700' : 'text-slate-700'}`}>
+                      {day.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}
+                    </p>
+                    {today && (
+                      <span className="text-xs bg-emerald-500 text-white px-1.5 py-0.5 rounded-full font-medium">Today</span>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => setAddingForDate(dateStr)}
+                    className="text-xs font-semibold text-emerald-600 bg-emerald-50 hover:bg-emerald-100 px-2.5 py-1 rounded-lg transition-colors"
+                  >
+                    + Add
+                  </button>
+                </div>
+
+                {/* Meals */}
+                {dayMeals.length > 0 ? (
+                  <div className="border-t border-slate-100 divide-y divide-slate-50">
+                    {dayMeals.map(meal => (
+                      <div key={meal.id} className="flex items-center gap-3 px-4 py-2.5">
+                        <span className="text-base flex-shrink-0">{SLOT_EMOJI[meal.slot]}</span>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-slate-700 truncate">{meal.name}</p>
+                          <p className="text-xs text-slate-400">
+                            {meal.slot.charAt(0).toUpperCase() + meal.slot.slice(1)} · {meal.servings} serving{meal.servings !== 1 ? 's' : ''}
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => setEditMeal(meal)}
+                          className="text-slate-300 hover:text-slate-500 text-sm transition-colors px-1"
+                        >
+                          ✏️
+                        </button>
+                        <button
+                          onClick={() => deleteMeal(meal.id)}
+                          className="text-slate-300 hover:text-red-400 text-lg transition-colors"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="border-t border-slate-50 px-4 py-2">
+                    <p className="text-xs text-slate-400 italic">No meals planned</p>
+                  </div>
+                )}
+              </div>
+            )
+          })}
         </div>
       </div>
+
+      {(addingForDate !== null || editMeal !== null) && (
+        <AddMealModal
+          date={addingForDate ?? editMeal!.date}
+          meal={editMeal ?? undefined}
+          onClose={() => { setAddingForDate(null); setEditMeal(null) }}
+          onSaved={() => { setAddingForDate(null); setEditMeal(null); void fetchMeals() }}
+        />
+      )}
     </div>
   )
 }

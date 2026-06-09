@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
 import AddPantryItemModal from '@/components/AddPantryItemModal'
 import ImportReceiptModal from '@/components/ImportReceiptModal'
+import CookTonightModal from '@/components/CookTonightModal'
 import { type Category, CATEGORIES } from '@/lib/categories'
 
 interface PantryItem {
@@ -436,29 +437,8 @@ const [showModal, setShowModal]                 = useState(false)
         />
       )}
 
-      {/* Cook tonight — placeholder modal */}
       {showCookModal && (
-        <div
-          className="fixed inset-0 z-[200] bg-black/40 flex items-center justify-center px-6"
-          onClick={() => setShowCookModal(false)}
-        >
-          <div
-            className="bg-white rounded-3xl p-6 w-full max-w-sm text-center"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <p className="text-4xl mb-3">🍽️</p>
-            <h2 className="text-lg font-bold text-slate-800 mb-2">Coming soon!</h2>
-            <p className="text-slate-500 text-sm leading-relaxed">
-              This will suggest meals based on what&apos;s in your pantry and what&apos;s expiring soon.
-            </p>
-            <button
-              onClick={() => setShowCookModal(false)}
-              className="mt-5 w-full py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-2xl transition-colors"
-            >
-              Got it
-            </button>
-          </div>
-        </div>
+        <CookTonightModal items={items} onClose={() => setShowCookModal(false)} />
       )}
     </div>
   )
