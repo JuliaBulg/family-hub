@@ -10,15 +10,16 @@ For each suggestion return:
 - emoji: a single food emoji that best represents the dish
 - description: 1-2 sentences, friendly and appetising
 - key_ingredients: array of 3-5 ingredient names from the provided pantry list that are the main components
-- missing: array of up to 3 key ingredient names NOT in the pantry that would be needed (empty array if nothing important is missing)
+- missing: array of up to 3 key ingredient names NOT in the pantry that would be needed, OR pantry items whose available quantity seems insufficient for the number of people (empty array if all good)
 - time_minutes: approximate total preparation + cooking time as a number
 
 Return ONLY valid JSON, no other text:
 {"suggestions":[{"name":"Pasta Bolognese","emoji":"🍝","description":"A hearty Italian classic...","key_ingredients":["pasta","mince meat"],"missing":[],"time_minutes":30}]}`
 
 export async function POST(req: NextRequest) {
-  const { items } = await req.json() as {
+  const { items, servings = 4 } = await req.json() as {
     items: { name: string; quantity: string | null; unit: string | null }[]
+    servings?: number
   }
 
   const pantryList = items
@@ -29,7 +30,7 @@ export async function POST(req: NextRequest) {
     model: 'claude-opus-4-7',
     max_tokens: 1024,
     system: SYSTEM_PROMPT,
-    messages: [{ role: 'user', content: `Pantry items: ${pantryList}` }],
+    messages: [{ role: 'user', content: `Cooking for: ${servings} people\nPantry items: ${pantryList}` }],
   })
 
   const text = message.content[0].type === 'text' ? message.content[0].text : ''
