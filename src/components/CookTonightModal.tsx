@@ -24,10 +24,17 @@ interface Props {
 
 export default function CookTonightModal({ items, onClose }: Props) {
   const [servings, setServings]       = useState(4)
+  const [maxMinutes, setMaxMinutes]   = useState<number | null>(45)
   const [suggestions, setSuggestions] = useState<Suggestion[]>([])
   const [loading, setLoading]         = useState(false)
   const [error, setError]             = useState('')
   const [done, setDone]               = useState(false)
+
+  const TIME_PRESETS = [
+    { label: '⚡ Quick',   sub: '≤ 25 min',  minutes: 25  },
+    { label: '🕐 Normal',  sub: '≤ 45 min',  minutes: 45  },
+    { label: '🍲 No rush', sub: 'any time',  minutes: null },
+  ]
 
   async function getSuggestions() {
     if (items.length === 0) return
@@ -37,7 +44,7 @@ export default function CookTonightModal({ items, onClose }: Props) {
       const res = await fetch('/api/cook-tonight', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ items, servings }),
+        body: JSON.stringify({ items, servings, maxMinutes }),
       })
       const json = await res.json()
       if (!res.ok || json.error) throw new Error(json.error ?? 'Server error')
@@ -100,6 +107,26 @@ export default function CookTonightModal({ items, onClose }: Props) {
                         +
                       </button>
                       <span className="text-sm text-slate-400">people</span>
+                    </div>
+                  </div>
+
+                  <div>
+                    <p className="text-sm font-medium text-slate-700 mb-2">How much time do you have?</p>
+                    <div className="grid grid-cols-3 gap-2">
+                      {TIME_PRESETS.map(p => (
+                        <button
+                          key={p.label}
+                          onClick={() => setMaxMinutes(p.minutes)}
+                          className={`py-2.5 px-1 rounded-xl border flex flex-col items-center gap-0.5 transition-colors ${
+                            maxMinutes === p.minutes
+                              ? 'bg-emerald-500 text-white border-emerald-500'
+                              : 'bg-slate-50 text-slate-600 border-slate-200'
+                          }`}
+                        >
+                          <span className="text-sm font-medium">{p.label}</span>
+                          <span className={`text-xs ${maxMinutes === p.minutes ? 'text-emerald-100' : 'text-slate-400'}`}>{p.sub}</span>
+                        </button>
+                      ))}
                     </div>
                   </div>
                   {error && <p className="text-red-500 text-sm">{error}</p>}
