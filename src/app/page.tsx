@@ -14,6 +14,7 @@ interface PantryItem {
   quantity: string | null
   unit: string | null
   expiry_date: string | null
+  shopping_alert_dismissed: boolean
 }
 
 function isExpiringSoon(dateStr: string | null): boolean {
@@ -115,13 +116,16 @@ const [showModal, setShowModal]                 = useState(false)
       added_by: profile?.display_name,
     })
     if (error) { console.error('sendExpiringSoonGroup:', error); return }
+    const ids = group.map(i => i.id)
+    await supabase.from('pantry_items').update({ shopping_alert_dismissed: true }).in('id', ids)
+    setItems(prev => prev.map(i => ids.includes(i.id) ? { ...i, shopping_alert_dismissed: true } : i))
     setShoppingNames(prev => new Set([...prev, key.toLowerCase()]))
     setRecentlySent(prev => new Set([...prev, key]))
     setTimeout(() => setRecentlySent(prev => { const s = new Set(prev); s.delete(key); return s }), 2000)
   }
 
-  const expiringSoon = items.filter(i => isExpiringSoon(i.expiry_date) && !shoppingNames.has(i.name.toLowerCase()))
-  const expired      = items.filter(i => isExpired(i.expiry_date))
+  const expiringSoon = items.filter(i => isExpiringSoon(i.expiry_date) && !i.shopping_alert_dismissed)
+  const expired      = items.filter(i => isExpired(i.expiry_date) && !i.shopping_alert_dismissed)
 
   return (
     <div className="px-4 pt-3">
@@ -258,6 +262,7 @@ const [showModal, setShowModal]                 = useState(false)
                       const anyExpired = group.some(i => isExpired(i.expiry_date))
                       const anySoon    = group.some(i => isExpiringSoon(i.expiry_date))
                       const onList     = group.some(i => shoppingNames.has(i.name.toLowerCase()))
+                      const wasOnList  = !onList && group.some(i => i.shopping_alert_dismissed)
                       const qty        = groupQuantity(group)
                       const ids        = group.map(i => i.id)
                       return (
@@ -274,7 +279,9 @@ const [showModal, setShowModal]                 = useState(false)
                               {anyExpired && <span className="text-red-500"> · 🚨 Expired</span>}
                               {!anyExpired && anySoon && (
                                 <span className="text-amber-500">
-                                  {' · ⏰ Expiring soon'}{onList && ' · 🛒 On list'}
+                                  {' · ⏰ Expiring soon'}
+                                  {onList    && ' · 🛒 On list'}
+                                  {wasOnList && ' · ✓ Was on list'}
                                 </span>
                               )}
                             </p>
