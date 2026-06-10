@@ -66,6 +66,7 @@ const [showModal, setShowModal]                 = useState(false)
   const [recentlySent, setRecentlySent]   = useState<Set<string>>(new Set())
   const [shoppingNames, setShoppingNames] = useState<Set<string>>(new Set())
   const [search, setSearch]               = useState('')
+  const [reservations, setReservations]   = useState<Map<string, { mealName: string; mealDate: string }>>(new Map())
 
   const fetchItems = useCallback(async () => {
     const { data } = await supabase
@@ -80,8 +81,24 @@ const [showModal, setShowModal]                 = useState(false)
     setShoppingNames(new Set((data ?? []).map(i => i.name.toLowerCase())))
   }, [])
 
+  const fetchReservations = useCallback(async () => {
+    const today = new Date().toISOString().split('T')[0]
+    const { data } = await supabase
+      .from('meal_ingredients')
+      .select('pantry_item_id, meals(name, date, cooked_at)')
+      .not('pantry_item_id', 'is', null)
+    const map = new Map<string, { mealName: string; mealDate: string }>()
+    for (const row of data ?? []) {
+      const meal = row.meals as unknown as { name: string; date: string; cooked_at: string | null } | null
+      if (!meal || meal.cooked_at || meal.date < today) continue
+      if (row.pantry_item_id) map.set(row.pantry_item_id, { mealName: meal.name, mealDate: meal.date })
+    }
+    setReservations(map)
+  }, [])
+
   useEffect(() => { fetchItems() }, [fetchItems])
   useEffect(() => { fetchShoppingNames() }, [fetchShoppingNames])
+  useEffect(() => { fetchReservations() }, [fetchReservations])
 
   async function deleteGroup(ids: string[]) {
     await supabase.from('pantry_items').delete().in('id', ids)
@@ -177,18 +194,19 @@ const [showModal, setShowModal]                 = useState(false)
                 {searchResults.length} result{searchResults.length !== 1 ? 's' : ''}
               </p>
               {searchResults.map(group => {
-                const cat        = CATEGORIES.find(c => c.value === group[0].category)
-                const anyExpired = group.some(i => isExpired(i.expiry_date))
-                const anySoon    = group.some(i => isExpiringSoon(i.expiry_date))
-                const onList     = group.some(i => shoppingNames.has(i.name.toLowerCase()))
-                const wasOnList  = !onList && group.some(i => i.shopping_alert_dismissed)
-                const qty        = groupQuantity(group)
-                const ids        = group.map(i => i.id)
+                const cat         = CATEGORIES.find(c => c.value === group[0].category)
+                const anyExpired  = group.some(i => isExpired(i.expiry_date))
+                const anySoon     = group.some(i => isExpiringSoon(i.expiry_date))
+                const onList      = group.some(i => shoppingNames.has(i.name.toLowerCase()))
+                const wasOnList   = !onList && group.some(i => i.shopping_alert_dismissed)
+                const reservation = group.map(i => reservations.get(i.id)).find(Boolean)
+                const qty         = groupQuantity(group)
+                const ids         = group.map(i => i.id)
                 return (
                   <div
                     key={group[0].id}
                     className={`flex items-center gap-3 px-4 py-3 bg-white border rounded-xl ${
-                      anyExpired ? 'border-red-200' : anySoon ? 'border-amber-200' : 'border-slate-100'
+                      anyExpired ? 'border-red-200' : anySoon ? 'border-amber-200' : reservation ? 'border-violet-200' : 'border-slate-100'
                     }`}
                   >
                     <span className="text-lg flex-shrink-0">{cat?.emoji}</span>
@@ -203,6 +221,9 @@ const [showModal, setShowModal]                 = useState(false)
                             {onList    && ' · 🛒 On list'}
                             {wasOnList && ' · ✓ Was on list'}
                           </span>
+                        )}
+                        {reservation && (
+                          <span className="text-violet-500"> · 📅 {reservation.mealName}</span>
                         )}
                       </p>
                     </div>
@@ -338,17 +359,18 @@ const [showModal, setShowModal]                 = useState(false)
                 {isOpen && groups.length > 0 && (
                   <div className="mt-1 ml-2 space-y-1">
                     {groups.map((group) => {
-                      const anyExpired = group.some(i => isExpired(i.expiry_date))
-                      const anySoon    = group.some(i => isExpiringSoon(i.expiry_date))
-                      const onList     = group.some(i => shoppingNames.has(i.name.toLowerCase()))
-                      const wasOnList  = !onList && group.some(i => i.shopping_alert_dismissed)
-                      const qty        = groupQuantity(group)
-                      const ids        = group.map(i => i.id)
+                      const anyExpired  = group.some(i => isExpired(i.expiry_date))
+                      const anySoon     = group.some(i => isExpiringSoon(i.expiry_date))
+                      const onList      = group.some(i => shoppingNames.has(i.name.toLowerCase()))
+                      const wasOnList   = !onList && group.some(i => i.shopping_alert_dismissed)
+                      const reservation = group.map(i => reservations.get(i.id)).find(Boolean)
+                      const qty         = groupQuantity(group)
+                      const ids         = group.map(i => i.id)
                       return (
                         <div
                           key={group[0].id}
                           className={`flex items-center gap-3 px-4 py-3 bg-white border rounded-xl ${
-                            anyExpired ? 'border-red-200' : anySoon ? 'border-amber-200' : 'border-slate-100'
+                            anyExpired ? 'border-red-200' : anySoon ? 'border-amber-200' : reservation ? 'border-violet-200' : 'border-slate-100'
                           }`}
                         >
                           <div className="flex-1">
@@ -362,6 +384,9 @@ const [showModal, setShowModal]                 = useState(false)
                                   {onList    && ' · 🛒 On list'}
                                   {wasOnList && ' · ✓ Was on list'}
                                 </span>
+                              )}
+                              {reservation && (
+                                <span className="text-violet-500"> · 📅 {reservation.mealName}</span>
                               )}
                             </p>
                           </div>

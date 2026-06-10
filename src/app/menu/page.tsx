@@ -2,7 +2,9 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
+import { useAuth } from '@/contexts/AuthContext'
 import AddMealModal from '@/components/AddMealModal'
+import MarkCookedModal from '@/components/MarkCookedModal'
 
 type Slot = 'breakfast' | 'lunch' | 'dinner'
 
@@ -20,10 +22,10 @@ const SLOT_ORDER: Record<Slot, number> = { breakfast: 0, lunch: 1, dinner: 2 }
 const SLOT_EMOJI: Record<Slot, string> = { breakfast: '🌅', lunch: '☀️', dinner: '🌙' }
 
 function getWeekDays(offset: number): Date[] {
-  const today = new Date()
-  const day   = today.getDay()
-  const diff  = day === 0 ? -6 : 1 - day
-  const monday = new Date(today)
+  const today   = new Date()
+  const day     = today.getDay()
+  const diff    = day === 0 ? -6 : 1 - day
+  const monday  = new Date(today)
   monday.setDate(today.getDate() + diff + offset * 7)
   monday.setHours(0, 0, 0, 0)
   return Array.from({ length: 7 }, (_, i) => {
@@ -42,10 +44,13 @@ function isToday(date: Date): boolean {
 }
 
 export default function MenuPage() {
+  const { profile } = useAuth()
   const [weekOffset, setWeekOffset]       = useState(0)
   const [meals, setMeals]                 = useState<Meal[]>([])
   const [addingForDate, setAddingForDate] = useState<string | null>(null)
   const [editMeal, setEditMeal]           = useState<Meal | null>(null)
+  const [cookMeal, setCookMeal]           = useState<Meal | null>(null)
+  const [addingMissing, setAddingMissing] = useState<string | null>(null)
 
   const fetchMeals = useCallback(async () => {
     const days = getWeekDays(weekOffset)
@@ -64,6 +69,31 @@ export default function MenuPage() {
   async function deleteMeal(id: string) {
     await supabase.from('meals').delete().eq('id', id)
     setMeals(prev => prev.filter(m => m.id !== id))
+  }
+
+  async function addMissingToShopping(meal: Meal) {
+    setAddingMissing(meal.id)
+
+    const { data: ings } = await supabase
+      .from('meal_ingredients')
+      .select('name, quantity, unit, pantry_item_id')
+      .eq('meal_id', meal.id)
+
+    const missing = (ings ?? []).filter(i => !i.pantry_item_id)
+
+    if (missing.length > 0) {
+      await supabase.from('shopping_items').insert(
+        missing.map(ing => ({
+          name: ing.name,
+          quantity: ing.quantity ? `${ing.quantity}${ing.unit ? ' ' + ing.unit : ''}` : null,
+          is_ticked: false,
+          household_id: profile?.household_id,
+          added_by: profile?.display_name,
+        }))
+      )
+    }
+
+    setAddingMissing(null)
   }
 
   const days      = getWeekDays(weekOffset)
@@ -134,26 +164,50 @@ export default function MenuPage() {
                 {dayMeals.length > 0 ? (
                   <div className="border-t border-slate-100 divide-y divide-slate-50">
                     {dayMeals.map(meal => (
-                      <div key={meal.id} className="flex items-center gap-3 px-4 py-2.5">
-                        <span className="text-base flex-shrink-0">{SLOT_EMOJI[meal.slot]}</span>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-slate-700 truncate">{meal.name}</p>
-                          <p className="text-xs text-slate-400">
-                            {meal.slot.charAt(0).toUpperCase() + meal.slot.slice(1)} · {meal.servings} serving{meal.servings !== 1 ? 's' : ''}
-                          </p>
+                      <div key={meal.id} className="px-4 py-2.5">
+                        <div className="flex items-center gap-3">
+                          <span className="text-base flex-shrink-0">{SLOT_EMOJI[meal.slot]}</span>
+                          <div className="flex-1 min-w-0">
+                            <p className={`text-sm font-medium truncate ${meal.cooked_at ? 'text-slate-400 line-through' : 'text-slate-700'}`}>
+                              {meal.name}
+                            </p>
+                            <p className="text-xs text-slate-400">
+                              {meal.slot.charAt(0).toUpperCase() + meal.slot.slice(1)} · {meal.servings} serving{meal.servings !== 1 ? 's' : ''}
+                              {meal.cooked_at && ' · ✅ Cooked'}
+                            </p>
+                          </div>
+                          <button
+                            onClick={() => setEditMeal(meal)}
+                            className="text-slate-300 hover:text-slate-500 text-sm transition-colors px-1"
+                          >
+                            ✏️
+                          </button>
+                          <button
+                            onClick={() => deleteMeal(meal.id)}
+                            className="text-slate-300 hover:text-red-400 text-lg transition-colors"
+                          >
+                            ✕
+                          </button>
                         </div>
-                        <button
-                          onClick={() => setEditMeal(meal)}
-                          className="text-slate-300 hover:text-slate-500 text-sm transition-colors px-1"
-                        >
-                          ✏️
-                        </button>
-                        <button
-                          onClick={() => deleteMeal(meal.id)}
-                          className="text-slate-300 hover:text-red-400 text-lg transition-colors"
-                        >
-                          ✕
-                        </button>
+
+                        {/* Action buttons — only for uncooked meals */}
+                        {!meal.cooked_at && (
+                          <div className="flex gap-2 mt-2 ml-8">
+                            <button
+                              onClick={() => addMissingToShopping(meal)}
+                              disabled={addingMissing === meal.id}
+                              className="text-xs font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 disabled:opacity-50 px-2.5 py-1 rounded-lg transition-colors"
+                            >
+                              {addingMissing === meal.id ? '…' : '🛒 Add missing'}
+                            </button>
+                            <button
+                              onClick={() => setCookMeal(meal)}
+                              className="text-xs font-medium text-emerald-600 bg-emerald-50 hover:bg-emerald-100 px-2.5 py-1 rounded-lg transition-colors"
+                            >
+                              ✅ Cooked
+                            </button>
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -174,6 +228,14 @@ export default function MenuPage() {
           meal={editMeal ?? undefined}
           onClose={() => { setAddingForDate(null); setEditMeal(null) }}
           onSaved={() => { setAddingForDate(null); setEditMeal(null); void fetchMeals() }}
+        />
+      )}
+
+      {cookMeal && (
+        <MarkCookedModal
+          meal={cookMeal}
+          onClose={() => setCookMeal(null)}
+          onCooked={() => { setCookMeal(null); void fetchMeals() }}
         />
       )}
     </div>
