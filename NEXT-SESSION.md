@@ -1,20 +1,24 @@
 # Family Hub — Next Session Starting Point
 
 **Written:** 10-Jun-2026
-**Session status:** Session 9 complete. Live at https://family-hub-seven-sigma.vercel.app
+**Session status:** Session 9+10 complete. Live at https://family-hub-seven-sigma.vercel.app
 
 ---
 
-## What was built in session 9
+## What was built in session 9–10
 
 | What | Where | Notes |
 |------|-------|-------|
-| src/lib/family-recipes.ts | NEW | 11 family favorites as preload data |
-| src/app/recipes/page.tsx | NEW | Browse, expand/collapse, add/edit/delete; auto-preloads on first visit |
-| src/components/AddRecipeModal.tsx | NEW | Name + dynamic ingredient rows (name / qty / unit per row) |
+| Recipes tab | `src/app/recipes/page.tsx` | Browse, expand, add/edit/delete; auto-preloads 11 family favorites |
+| AddRecipeModal | `src/components/AddRecipeModal.tsx` | Name + dynamic ingredient rows |
 | BottomNav — 5 tabs | `src/components/BottomNav.tsx` | Pantry · Shopping · Menu · Recipes · Expenses |
-| Cook Tonight — ♡ Save | `src/components/CookTonightModal.tsx` | Saves AI suggestion to recipe book permanently |
-| AddMealModal — Pick from recipes | `src/components/AddMealModal.tsx` | Picks stored recipe, loads ingredients directly (no AI call) |
+| Cook Tonight — ♡ Save | `src/components/CookTonightModal.tsx` | Saves suggestion to recipe book |
+| Cook Tonight — 📅 Plan this | `src/components/CookTonightModal.tsx` | Opens date/slot picker to plan the meal |
+| Cook Tonight — 🛒 Add missing | `src/components/CookTonightModal.tsx` | Adds suggestion's missing items to shopping list |
+| Cook Tonight — 🥦 Vegetarian | `src/components/CookTonightModal.tsx` + API | Toggle forces all suggestions to be vegetarian |
+| AddMealModal — Pick from recipes | `src/components/AddMealModal.tsx` | Uses stored recipe ingredients, no AI call |
+| Plan this meal | `src/components/PlanRecipeModal.tsx` | From Recipes tab + Cook Tonight → date/slot picker → Menu |
+| Recipe search | `src/app/recipes/page.tsx` | Client-side filter by name |
 
 ---
 
@@ -24,50 +28,41 @@
 |---------|--------|-------|
 | Auth + household + invite | ✅ Working | |
 | Pantry — full CRUD + search + expiry | ✅ Working | |
-| Pantry — reservation badges | ✅ Working | |
+| Pantry — reservation badges | ✅ Working | Violet border + 📅 name on items reserved for upcoming meals |
+| Pantry — deduction when cooked | ✅ Working | MarkCookedModal deducts checked ingredients |
 | Receipt import → pantry + expenses | ✅ Working | |
 | Shopping list | ✅ Working | |
 | Expenses tab | ✅ Working | |
 | Meal Planner — full | ✅ Working | Week view, ingredients, cooked, deduction |
-| Cook Tonight AI | ✅ Working | Servings + time presets + ♡ Save to recipes |
-| Recipes tab | ✅ Working | Browse, add/edit/delete, auto-preloaded 11 family favorites |
-| Recipes → Menu planner | 🚧 Partial | Menu→Recipes done; Recipes→Menu missing (see Priority 1) |
+| Cook Tonight AI | ✅ Working | Servings + time + vegetarian toggle + plan/save/shop buttons |
+| Recipes tab | ✅ Working | Browse, add/edit/delete, search, 11 preloaded favorites |
+| Recipes ↔ Menu two-way | ✅ Working | Menu→Recipes (Pick from recipes) + Recipes→Menu (Plan this meal) |
 
 ---
 
-## Priority 1 — "Plan this meal" button (small, high value)
+## No pending priorities
 
-From a recipe in the Recipes tab, user should be able to tap **"📅 Plan this meal"** and it opens a mini picker: choose date + slot → recipe gets added to the Menu planner with ingredients already loaded.
-
-This completes the two-way connection:
-- Menu → Recipes: ✅ "Pick from recipes" when adding a meal
-- Recipes → Menu: ❌ still missing
-
-### Implementation
-- In `src/app/recipes/page.tsx`: add "📅 Plan this meal" button in the expanded card (alongside Edit / Delete)
-- Tapping opens a mini modal (or inline date+slot picker)
-- On confirm: call the same logic as AddMealModal but skip the form — just INSERT meal with the recipe name + load recipe_ingredients as meal_ingredients
-
-Could reuse AddMealModal with a new prop `prefillRecipe?: { id: string; name: string }` to pre-fill and skip the picker step.
+The core feature set is complete. What follows are **optional future improvements** only — do not implement unless explicitly asked.
 
 ---
 
-## Priority 2 — Cook Tonight "Add to Menu" button
+## 💡 Ideas — future improvements
 
-After AI gives suggestions, let user tap **"📅 Add to Menu"** on a suggestion card (next to ♡ Save). It opens a date+slot picker → adds the meal to the planner. This makes Cook Tonight useful for planning ahead, not just eating that evening.
+### UX polish
+| Idea | Effort | Notes |
+|------|--------|-------|
+| Shopping list grouped by category | Medium | Items grouped under Meat, Dairy, Vegetables etc — better for in-store navigation |
+| Pantry "Expiring soon" strip | Small | Highlighted section at top of Pantry showing items expiring within 3 days |
+| "Plan for today / tomorrow" shortcuts | Tiny | Quick buttons in PlanRecipeModal so user skips the date picker for common cases |
+| Vegetarian badge on suggestions | Tiny | Auto-detect and show 🥦 on cards that happen to be vegetarian even without the toggle |
 
-Same mini-modal approach as Priority 1.
-
----
-
-## Priority 3 — Polish passes (low effort, nice UX)
-
-| Item | Where | Notes |
-|------|-------|-------|
-| Recipe search / filter | Recipes page | Simple client-side filter by name |
-| Serving count on recipe cards | Recipes page | Show "for 4 people" — recipes.md is all for 4 |
-| Cook Tonight suggestion → "Add to Menu" | CookTonightModal | See Priority 2 |
-| Shopping list — sort by category | Shopping page | Group items by pantry category |
+### Possible new features (bigger scope)
+| Idea | Effort | Notes |
+|------|--------|-------|
+| Weekly meal plan PDF / share | Large | Export the week as a printable or shareable format |
+| Pantry item barcode scan | Large | Camera scan to add items — out of scope for v1 |
+| Expense charts / monthly summary | Medium | Visualise spending by category over time |
+| Household invite via QR code | Small | Alternative to sharing the invite code string |
 
 ---
 
@@ -100,8 +95,9 @@ Same mini-modal approach as Priority 1.
 | `src/components/ImportReceiptModal.tsx` | Receipt import |
 | `src/components/AddMealModal.tsx` | Add/edit meal — has "Pick from recipes" option |
 | `src/components/MarkCookedModal.tsx` | Mark meal as cooked + pantry deduction |
-| `src/components/CookTonightModal.tsx` | Cook Tonight — has ♡ Save to recipes |
-| `src/components/AddRecipeModal.tsx` | Add/edit recipe (name + dynamic ingredient rows) |
+| `src/components/CookTonightModal.tsx` | Cook Tonight AI modal |
+| `src/components/AddRecipeModal.tsx` | Add/edit recipe |
+| `src/components/PlanRecipeModal.tsx` | Plan any meal — from Recipes tab or Cook Tonight suggestion |
 | `src/app/page.tsx` | Pantry tab |
 | `src/app/shopping/page.tsx` | Shopping list |
 | `src/app/menu/page.tsx` | Meal planner |
