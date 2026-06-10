@@ -39,6 +39,7 @@ export default function RecipesPage() {
   const [editRecipe, setEditRecipe] = useState<Recipe | null>(null)
   const [planRecipe, setPlanRecipe] = useState<Recipe | null>(null)
   const [deleting, setDeleting]     = useState<string | null>(null)
+  const [query, setQuery]           = useState('')
 
   const fetchRecipes = useCallback(async () => {
     const { data } = await supabase
@@ -128,6 +129,20 @@ export default function RecipesPage() {
           </button>
         </div>
 
+        {/* Search */}
+        {recipes.length > 0 && (
+          <div className="relative mb-3">
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">🔍</span>
+            <input
+              type="text"
+              value={query}
+              onChange={e => setQuery(e.target.value)}
+              placeholder="Search recipes…"
+              className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-800 placeholder-slate-400 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+            />
+          </div>
+        )}
+
         {/* Recipe list */}
         {recipes.length === 0 ? (
           <div className="text-center py-24 text-slate-400">
@@ -137,7 +152,10 @@ export default function RecipesPage() {
           </div>
         ) : (
           <div className="space-y-2">
-            {recipes.map(recipe => {
+            {recipes.filter(r => !query || r.name.toLowerCase().includes(query.toLowerCase())).length === 0 && (
+              <p className="text-sm text-slate-400 text-center py-8">No recipes match &ldquo;{query}&rdquo;</p>
+            )}
+            {recipes.filter(r => !query || r.name.toLowerCase().includes(query.toLowerCase())).map(recipe => {
               const isOpen = expanded.has(recipe.id)
               const ings   = [...(recipe.ingredients ?? [])].sort((a, b) => a.sort_order - b.sort_order)
 
@@ -227,7 +245,7 @@ export default function RecipesPage() {
 
       {planRecipe && (
         <PlanRecipeModal
-          recipe={planRecipe}
+          meal={planRecipe}
           onClose={() => setPlanRecipe(null)}
           onPlanned={() => setPlanRecipe(null)}
         />

@@ -17,10 +17,11 @@ Return ONLY valid JSON, no other text:
 {"suggestions":[{"name":"Pasta Bolognese","emoji":"🍝","description":"A hearty Italian classic...","key_ingredients":["pasta","mince meat"],"missing":[],"time_minutes":30}]}`
 
 export async function POST(req: NextRequest) {
-  const { items, servings = 4, maxMinutes = null } = await req.json() as {
+  const { items, servings = 4, maxMinutes = null, vegetarian = false } = await req.json() as {
     items: { name: string; quantity: string | null; unit: string | null }[]
     servings?: number
     maxMinutes?: number | null
+    vegetarian?: boolean
   }
 
   const pantryList = items
@@ -28,12 +29,13 @@ export async function POST(req: NextRequest) {
     .join(', ')
 
   const timeConstraint = maxMinutes != null ? `Time available: up to ${maxMinutes} minutes` : 'No time limit'
+  const dietNote       = vegetarian ? 'Dietary requirement: ALL 3 suggestions must be completely vegetarian (no meat, no fish, no poultry).' : ''
 
   const message = await client.messages.create({
     model: 'claude-opus-4-7',
     max_tokens: 1024,
     system: SYSTEM_PROMPT,
-    messages: [{ role: 'user', content: `Cooking for: ${servings} people\n${timeConstraint}\nPantry items: ${pantryList}` }],
+    messages: [{ role: 'user', content: `Cooking for: ${servings} people\n${timeConstraint}${dietNote ? '\n' + dietNote : ''}\nPantry items: ${pantryList}` }],
   })
 
   const text = message.content[0].type === 'text' ? message.content[0].text : ''

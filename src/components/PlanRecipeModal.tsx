@@ -6,13 +6,12 @@ import { useAuth } from '@/contexts/AuthContext'
 
 type Slot = 'breakfast' | 'lunch' | 'dinner'
 
-interface Recipe {
-  id: string
-  name: string
-}
-
 interface Props {
-  recipe: Recipe
+  meal: {
+    id?: string          // recipe id — if present, loads recipe_ingredients
+    name: string
+    keyIngredients?: string[]  // from Cook Tonight suggestions (no quantities)
+  }
   onClose: () => void
   onPlanned: () => void
 }
@@ -27,13 +26,13 @@ function todayStr() {
   return new Date().toISOString().split('T')[0]
 }
 
-export default function PlanRecipeModal({ recipe, onClose, onPlanned }: Props) {
+export default function PlanRecipeModal({ meal, onClose, onPlanned }: Props) {
   const { profile } = useAuth()
-  const [date, setDate]       = useState(todayStr())
-  const [slot, setSlot]       = useState<Slot>('dinner')
+  const [date, setDate]         = useState(todayStr())
+  const [slot, setSlot]         = useState<Slot>('dinner')
   const [servings, setServings] = useState(4)
-  const [loading, setLoading] = useState(false)
-  const [done, setDone]       = useState(false)
+  const [loading, setLoading]   = useState(false)
+  const [done, setDone]         = useState(false)
 
   async function handlePlan() {
     setLoading(true)
@@ -44,39 +43,61 @@ export default function PlanRecipeModal({ recipe, onClose, onPlanned }: Props) {
         household_id: profile?.household_id,
         date,
         slot,
-        name: recipe.name,
+        name: meal.name,
         servings,
         added_by: profile?.display_name,
       })
       .select('id')
       .single()
 
-    if (mealErr || !newMeal) {
-      setLoading(false)
-      return
-    }
+    if (mealErr || !newMeal) { setLoading(false); return }
 
-    const [{ data: recipeIngs }, { data: pantryItems }] = await Promise.all([
-      supabase.from('recipe_ingredients').select('name, quantity, unit').eq('recipe_id', recipe.id).order('sort_order'),
-      supabase.from('pantry_items').select('id, name'),
-    ])
+    const { data: pantryItems } = await supabase.from('pantry_items').select('id, name')
 
-    if (recipeIngs && recipeIngs.length > 0) {
-      const matched = recipeIngs.map(ing => {
-        const lower = ing.name.toLowerCase()
-        const match = (pantryItems ?? []).find(p =>
-          p.name.toLowerCase().includes(lower) || lower.includes(p.name.toLowerCase())
+    if (meal.id) {
+      // From Recipes tab — load stored recipe_ingredients with quantities
+      const { data: recipeIngs } = await supabase
+        .from('recipe_ingredients')
+        .select('name, quantity, unit')
+        .eq('recipe_id', meal.id)
+        .order('sort_order')
+
+      if (recipeIngs && recipeIngs.length > 0) {
+        await supabase.from('meal_ingredients').insert(
+          recipeIngs.map(ing => {
+            const lower = ing.name.toLowerCase()
+            const match = (pantryItems ?? []).find(p =>
+              p.name.toLowerCase().includes(lower) || lower.includes(p.name.toLowerCase())
+            )
+            return {
+              meal_id: newMeal.id,
+              household_id: profile?.household_id,
+              name: ing.name,
+              quantity: ing.quantity,
+              unit: ing.unit,
+              pantry_item_id: match?.id ?? null,
+            }
+          })
         )
-        return {
-          meal_id: newMeal.id,
-          household_id: profile?.household_id,
-          name: ing.name,
-          quantity: ing.quantity,
-          unit: ing.unit,
-          pantry_item_id: match?.id ?? null,
-        }
-      })
-      await supabase.from('meal_ingredients').insert(matched)
+      }
+    } else if (meal.keyIngredients && meal.keyIngredients.length > 0) {
+      // From Cook Tonight — key_ingredients are names only (no quantities)
+      await supabase.from('meal_ingredients').insert(
+        meal.keyIngredients.map(name => {
+          const lower = name.toLowerCase()
+          const match = (pantryItems ?? []).find(p =>
+            p.name.toLowerCase().includes(lower) || lower.includes(p.name.toLowerCase())
+          )
+          return {
+            meal_id: newMeal.id,
+            household_id: profile?.household_id,
+            name,
+            quantity: null,
+            unit: null,
+            pantry_item_id: match?.id ?? null,
+          }
+        })
+      )
     }
 
     setLoading(false)
@@ -98,7 +119,7 @@ export default function PlanRecipeModal({ recipe, onClose, onPlanned }: Props) {
         <div className="flex-shrink-0 px-6 pt-2 pb-3 flex items-center justify-between">
           <div>
             <h2 className="text-xl font-bold text-slate-800">📅 Plan this meal</h2>
-            <p className="text-xs text-slate-400 mt-0.5 truncate max-w-[220px]">{recipe.name}</p>
+            <p className="text-xs text-slate-400 mt-0.5 truncate max-w-[220px]">{meal.name}</p>
           </div>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600 text-2xl leading-none">✕</button>
         </div>
