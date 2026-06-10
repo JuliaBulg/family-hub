@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
 import AddRecipeModal from '@/components/AddRecipeModal'
+import PlanRecipeModal from '@/components/PlanRecipeModal'
 import { FAMILY_RECIPES_PRELOAD } from '@/lib/family-recipes'
 
 interface RecipeIngredient {
@@ -34,9 +35,10 @@ export default function RecipesPage() {
   const [recipes, setRecipes]     = useState<Recipe[]>([])
   const [loading, setLoading]     = useState(true)
   const [expanded, setExpanded]   = useState<Set<string>>(new Set())
-  const [showModal, setShowModal] = useState(false)
+  const [showModal, setShowModal]   = useState(false)
   const [editRecipe, setEditRecipe] = useState<Recipe | null>(null)
-  const [deleting, setDeleting]   = useState<string | null>(null)
+  const [planRecipe, setPlanRecipe] = useState<Recipe | null>(null)
+  const [deleting, setDeleting]     = useState<string | null>(null)
 
   const fetchRecipes = useCallback(async () => {
     const { data } = await supabase
@@ -185,7 +187,13 @@ export default function RecipesPage() {
                         <p className="text-xs text-slate-400 pt-2">No ingredients listed</p>
                       )}
 
-                      <div className="flex gap-2 mt-3">
+                      <div className="flex gap-2 mt-3 flex-wrap">
+                        <button
+                          onClick={() => setPlanRecipe(recipe)}
+                          className="text-xs font-medium text-emerald-600 bg-emerald-50 hover:bg-emerald-100 px-3 py-1.5 rounded-lg transition-colors"
+                        >
+                          📅 Plan this meal
+                        </button>
                         <button
                           onClick={() => { setEditRecipe(recipe); setShowModal(true) }}
                           className="text-xs font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded-lg transition-colors"
@@ -214,6 +222,14 @@ export default function RecipesPage() {
           recipe={editRecipe ?? undefined}
           onClose={() => { setShowModal(false); setEditRecipe(null) }}
           onSaved={() => { setShowModal(false); setEditRecipe(null); void fetchRecipes() }}
+        />
+      )}
+
+      {planRecipe && (
+        <PlanRecipeModal
+          recipe={planRecipe}
+          onClose={() => setPlanRecipe(null)}
+          onPlanned={() => setPlanRecipe(null)}
         />
       )}
     </div>
