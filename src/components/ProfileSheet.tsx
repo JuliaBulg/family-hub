@@ -19,7 +19,8 @@ export default function ProfileSheet({ open, onClose }: Props) {
   const [updatingRole, setUpdatingRole]   = useState<string | null>(null)
   const [signingOut, setSigningOut]       = useState(false)
   const [mounted, setMounted]             = useState(false)
-  const [savingLang, setSavingLang]       = useState(false)
+  const [savingLang, setSavingLang]   = useState(false)
+  const [langSaved, setLangSaved]     = useState(false)
 
   const LANGUAGES = [
     { code: 'en', flag: '🇬🇧', label: 'English' },
@@ -30,9 +31,12 @@ export default function ProfileSheet({ open, onClose }: Props) {
   async function changeLanguage(lang: string) {
     if (!user) return
     setSavingLang(true)
+    setLangSaved(false)
     await supabase.from('profiles').update({ language: lang }).eq('user_id', user.id)
     await refreshProfile()
     setSavingLang(false)
+    setLangSaved(true)
+    setTimeout(() => setLangSaved(false), 2000)
   }
 
   useEffect(() => { setMounted(true) }, [])
@@ -134,7 +138,11 @@ export default function ProfileSheet({ open, onClose }: Props) {
 
             {/* Language picker */}
             <div className="mb-5">
-              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">Language · AI responses</p>
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Language · AI responses</p>
+                {savingLang && <p className="text-xs text-slate-400">Saving…</p>}
+                {langSaved && <p className="text-xs text-emerald-600 font-medium">✓ Saved</p>}
+              </div>
               <div className="flex gap-2">
                 {LANGUAGES.map(lang => (
                   <button
