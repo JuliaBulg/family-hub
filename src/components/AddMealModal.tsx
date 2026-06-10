@@ -49,6 +49,31 @@ export default function AddMealModal({ date, meal, onClose, onSaved }: Props) {
   const [addingToShop, setAddingToShop]  = useState(false)
   const [shopAdded, setShopAdded]        = useState(false)
 
+  const [showRecipePicker, setShowRecipePicker] = useState(false)
+  const [recipeList, setRecipeList]             = useState<{ id: string; name: string }[]>([])
+  const [selectedRecipeId, setSelectedRecipeId] = useState<string | null>(null)
+  const [loadingRecipes, setLoadingRecipes]     = useState(false)
+
+  async function openRecipePicker() {
+    setShowRecipePicker(true)
+    if (recipeList.length > 0) return
+    setLoadingRecipes(true)
+    const { data } = await supabase.from('recipes').select('id, name').order('name')
+    setRecipeList(data ?? [])
+    setLoadingRecipes(false)
+  }
+
+  function pickRecipe(id: string, recipeName: string) {
+    setSelectedRecipeId(id)
+    setName(recipeName)
+    setShowRecipePicker(false)
+  }
+
+  function clearRecipe() {
+    setSelectedRecipeId(null)
+    setName('')
+  }
+
   async function handleSubmit() {
     if (!name.trim()) return
     setLoading(true)
@@ -78,16 +103,21 @@ export default function AddMealModal({ date, meal, onClose, onSaved }: Props) {
 
     const { data: pantryItems } = await supabase.from('pantry_items').select('id, name')
 
-    try {
-      const res = await fetch('/api/meal-ingredients', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mealName: name.trim(), servings, pantryItems: pantryItems ?? [] }),
-      })
-      const json = await res.json()
-      if (!res.ok || json.error) throw new Error()
+    if (selectedRecipeId) {
+      const { data: recipeIngs } = await supabase
+        .from('recipe_ingredients')
+        .select('name, quantity, unit')
+        .eq('recipe_id', selectedRecipeId)
+        .order('sort_order')
 
-      const ings: Ingredient[] = json.ingredients ?? []
+      const ings: Ingredient[] = (recipeIngs ?? []).map(ing => {
+        const lower = ing.name.toLowerCase()
+        const match = (pantryItems ?? []).find(p =>
+          p.name.toLowerCase().includes(lower) || lower.includes(p.name.toLowerCase())
+        )
+        return { name: ing.name, quantity: ing.quantity, unit: ing.unit, pantry_item_id: match?.id ?? null }
+      })
+
       if (ings.length > 0) {
         await supabase.from('meal_ingredients').insert(
           ings.map(ing => ({
@@ -104,9 +134,37 @@ export default function AddMealModal({ date, meal, onClose, onSaved }: Props) {
       setSavedMealName(name.trim())
       setLoading(false)
       setStep(2)
-    } catch {
-      setLoading(false)
-      onSaved()
+    } else {
+      try {
+        const res = await fetch('/api/meal-ingredients', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ mealName: name.trim(), servings, pantryItems: pantryItems ?? [] }),
+        })
+        const json = await res.json()
+        if (!res.ok || json.error) throw new Error()
+
+        const ings: Ingredient[] = json.ingredients ?? []
+        if (ings.length > 0) {
+          await supabase.from('meal_ingredients').insert(
+            ings.map(ing => ({
+              meal_id: newMeal.id,
+              household_id: profile?.household_id,
+              name: ing.name,
+              quantity: ing.quantity,
+              unit: ing.unit,
+              pantry_item_id: ing.pantry_item_id,
+            }))
+          )
+          setIngredients(ings)
+        }
+        setSavedMealName(name.trim())
+        setLoading(false)
+        setStep(2)
+      } catch {
+        setLoading(false)
+        onSaved()
+      }
     }
   }
 
@@ -243,15 +301,55 @@ export default function AddMealModal({ date, meal, onClose, onSaved }: Props) {
           </div>
 
           <div>
-            <label className="text-sm font-medium text-slate-600 mb-1 block">Meal name</label>
-            <input
-              type="text"
-              value={name}
-              onChange={e => setName(e.target.value)}
-              placeholder="e.g. Pasta Bolognese, Chicken soup…"
-              autoFocus={!meal}
-              className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-400"
-            />
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-sm font-medium text-slate-600">Meal name</label>
+              {!meal && (
+                <button
+                  onClick={openRecipePicker}
+                  className="text-xs font-medium text-emerald-600 hover:text-emerald-700"
+                >
+                  📖 Pick from recipes
+                </button>
+              )}
+            </div>
+
+            {selectedRecipeId ? (
+              <div className="flex items-center gap-2 px-4 py-3 rounded-xl border border-emerald-300 bg-emerald-50">
+                <span className="text-sm font-medium text-emerald-800 flex-1 truncate">{name}</span>
+                <button onClick={clearRecipe} className="text-emerald-500 hover:text-emerald-700 text-sm">✕</button>
+              </div>
+            ) : (
+              <input
+                type="text"
+                value={name}
+                onChange={e => setName(e.target.value)}
+                placeholder="e.g. Pasta Bolognese, Chicken soup…"
+                autoFocus={!meal}
+                className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-400"
+              />
+            )}
+
+            {showRecipePicker && !selectedRecipeId && (
+              <div className="mt-2 border border-slate-200 rounded-xl overflow-hidden bg-white shadow-sm">
+                {loadingRecipes ? (
+                  <p className="text-sm text-slate-400 px-4 py-3 animate-pulse">Loading…</p>
+                ) : recipeList.length === 0 ? (
+                  <p className="text-sm text-slate-400 px-4 py-3">No recipes saved yet</p>
+                ) : (
+                  <div className="max-h-48 overflow-y-auto divide-y divide-slate-50">
+                    {recipeList.map(r => (
+                      <button
+                        key={r.id}
+                        onClick={() => pickRecipe(r.id, r.name)}
+                        className="w-full text-left px-4 py-2.5 text-sm text-slate-700 hover:bg-emerald-50 hover:text-emerald-800 transition-colors"
+                      >
+                        {r.name}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           <div>

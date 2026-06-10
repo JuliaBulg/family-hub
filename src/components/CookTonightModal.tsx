@@ -1,6 +1,8 @@
 'use client'
 
 import { useState } from 'react'
+import { supabase } from '@/lib/supabase'
+import { useAuth } from '@/contexts/AuthContext'
 
 interface PantryItem {
   name: string
@@ -23,18 +25,43 @@ interface Props {
 }
 
 export default function CookTonightModal({ items, onClose }: Props) {
+  const { profile } = useAuth()
   const [servings, setServings]       = useState(4)
   const [maxMinutes, setMaxMinutes]   = useState<number | null>(45)
   const [suggestions, setSuggestions] = useState<Suggestion[]>([])
   const [loading, setLoading]         = useState(false)
   const [error, setError]             = useState('')
   const [done, setDone]               = useState(false)
+  const [saved, setSaved]             = useState<Set<number>>(new Set())
+  const [saving, setSaving]           = useState<number | null>(null)
 
   const TIME_PRESETS = [
     { label: '⚡ Quick',   sub: '≤ 25 min',  minutes: 25  },
     { label: '🕐 Normal',  sub: '≤ 45 min',  minutes: 45  },
     { label: '🍲 No rush', sub: 'any time',  minutes: null },
   ]
+
+  async function saveToRecipes(s: Suggestion, index: number) {
+    setSaving(index)
+    const { data: newRecipe } = await supabase
+      .from('recipes')
+      .insert({ name: s.name, household_id: profile?.household_id, source: 'ai', added_by: profile?.display_name })
+      .select('id')
+      .single()
+
+    if (newRecipe && s.key_ingredients.length > 0) {
+      await supabase.from('recipe_ingredients').insert(
+        s.key_ingredients.map((name, i) => ({
+          recipe_id: newRecipe.id,
+          household_id: profile?.household_id,
+          name,
+          sort_order: i,
+        }))
+      )
+    }
+    setSaved(prev => new Set(prev).add(index))
+    setSaving(null)
+  }
 
   async function getSuggestions() {
     if (items.length === 0) return
@@ -176,7 +203,7 @@ export default function CookTonightModal({ items, onClose }: Props) {
                   )}
 
                   {s.missing.length > 0 && (
-                    <div className="flex flex-wrap gap-1">
+                    <div className="flex flex-wrap gap-1 mb-3">
                       {s.missing.map(ing => (
                         <span key={ing} className="text-xs bg-red-50 text-red-500 px-2 py-0.5 rounded-full font-medium">
                           − {ing}
@@ -184,6 +211,20 @@ export default function CookTonightModal({ items, onClose }: Props) {
                       ))}
                     </div>
                   )}
+
+                  <div className="flex justify-end">
+                    <button
+                      onClick={() => saveToRecipes(s, i)}
+                      disabled={saving === i || saved.has(i)}
+                      className={`text-xs font-medium px-3 py-1.5 rounded-lg transition-colors ${
+                        saved.has(i)
+                          ? 'text-emerald-600 bg-emerald-50'
+                          : 'text-slate-500 bg-white border border-slate-200 hover:bg-slate-50'
+                      }`}
+                    >
+                      {saved.has(i) ? '✓ Saved to recipes' : saving === i ? '…' : '♡ Save to recipes'}
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>

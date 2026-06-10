@@ -7,6 +7,7 @@ const tabs = [
   { href: '/',          label: 'Pantry',   emoji: '📦' },
   { href: '/shopping',  label: 'Shopping', emoji: '🛒' },
   { href: '/menu',      label: 'Menu',     emoji: '🍽️' },
+  { href: '/recipes',   label: 'Recipes',  emoji: '📖' },
   { href: '/expenses',  label: 'Expenses', emoji: '💰' },
 ]
 
