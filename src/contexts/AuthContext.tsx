@@ -8,6 +8,7 @@ export interface Profile {
   display_name: string
   household_id: string | null
   role: 'parent' | 'child'
+  language: string
 }
 
 interface AuthContextType {
@@ -38,10 +39,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const { data } = await supabase
         .from('profiles')
-        .select('display_name, household_id, role')
+        .select('display_name, household_id, role, language')
         .eq('user_id', userId)
         .single()
-      setProfile(data ?? null)
+      setProfile(data ? { ...data, language: data.language ?? 'en' } : null)
     } catch {
       setProfile(null)
     } finally {

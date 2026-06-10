@@ -16,26 +16,41 @@ For each suggestion return:
 Return ONLY valid JSON, no other text:
 {"suggestions":[{"name":"Pasta Bolognese","emoji":"🍝","description":"A hearty Italian classic...","key_ingredients":["pasta","mince meat"],"missing":[],"time_minutes":30}]}`
 
+const LANGUAGE_INSTRUCTION: Record<string, string> = {
+  et: 'IMPORTANT: Respond entirely in Estonian (eesti keel). All meal names, descriptions, and ingredient names must be in Estonian.',
+  ru: 'IMPORTANT: Respond entirely in Russian (на русском языке). All meal names, descriptions, and ingredient names must be in Russian.',
+}
+
 export async function POST(req: NextRequest) {
-  const { items, servings = 4, maxMinutes = null, vegetarian = false } = await req.json() as {
+  const { items, servings = 4, maxMinutes = null, vegetarian = false, language = 'en' } = await req.json() as {
     items: { name: string; quantity: string | null; unit: string | null }[]
     servings?: number
     maxMinutes?: number | null
     vegetarian?: boolean
+    language?: string
   }
 
   const pantryList = items
     .map(i => `${i.name}${i.quantity ? ` (${i.quantity}${i.unit ? ' ' + i.unit : ''})` : ''}`)
     .join(', ')
 
-  const timeConstraint = maxMinutes != null ? `Time available: up to ${maxMinutes} minutes` : 'No time limit'
-  const dietNote       = vegetarian ? 'Dietary requirement: ALL 3 suggestions must be completely vegetarian (no meat, no fish, no poultry).' : ''
+  const timeConstraint  = maxMinutes != null ? `Time available: up to ${maxMinutes} minutes` : 'No time limit'
+  const dietNote        = vegetarian ? 'Dietary requirement: ALL 3 suggestions must be completely vegetarian (no meat, no fish, no poultry).' : ''
+  const languageNote    = LANGUAGE_INSTRUCTION[language] ?? ''
+
+  const userContent = [
+    `Cooking for: ${servings} people`,
+    timeConstraint,
+    dietNote,
+    languageNote,
+    `Pantry items: ${pantryList}`,
+  ].filter(Boolean).join('\n')
 
   const message = await client.messages.create({
     model: 'claude-opus-4-7',
     max_tokens: 1024,
     system: SYSTEM_PROMPT,
-    messages: [{ role: 'user', content: `Cooking for: ${servings} people\n${timeConstraint}${dietNote ? '\n' + dietNote : ''}\nPantry items: ${pantryList}` }],
+    messages: [{ role: 'user', content: userContent }],
   })
 
   const text = message.content[0].type === 'text' ? message.content[0].text : ''

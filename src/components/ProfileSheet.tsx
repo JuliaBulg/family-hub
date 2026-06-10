@@ -11,7 +11,7 @@ interface Props {
 }
 
 export default function ProfileSheet({ open, onClose }: Props) {
-  const { user, profile, signOut } = useAuth()
+  const { user, profile, signOut, refreshProfile } = useAuth()
   const [householdName, setHouseholdName] = useState<string | null>(null)
   const [inviteCode, setInviteCode]       = useState<string | null>(null)
   const [inviteCopied, setInviteCopied]   = useState(false)
@@ -19,6 +19,21 @@ export default function ProfileSheet({ open, onClose }: Props) {
   const [updatingRole, setUpdatingRole]   = useState<string | null>(null)
   const [signingOut, setSigningOut]       = useState(false)
   const [mounted, setMounted]             = useState(false)
+  const [savingLang, setSavingLang]       = useState(false)
+
+  const LANGUAGES = [
+    { code: 'en', flag: '🇬🇧', label: 'English' },
+    { code: 'et', flag: '🇪🇪', label: 'Eesti'   },
+    { code: 'ru', flag: '🇷🇺', label: 'Русский'  },
+  ]
+
+  async function changeLanguage(lang: string) {
+    if (!user) return
+    setSavingLang(true)
+    await supabase.from('profiles').update({ language: lang }).eq('user_id', user.id)
+    await refreshProfile()
+    setSavingLang(false)
+  }
 
   useEffect(() => { setMounted(true) }, [])
 
@@ -114,6 +129,28 @@ export default function ProfileSheet({ open, onClose }: Props) {
                   {profile?.role ?? 'Member'}
                 </p>
                 <p className="text-xs text-slate-400">Account role</p>
+              </div>
+            </div>
+
+            {/* Language picker */}
+            <div className="mb-5">
+              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">Language · AI responses</p>
+              <div className="flex gap-2">
+                {LANGUAGES.map(lang => (
+                  <button
+                    key={lang.code}
+                    onClick={() => void changeLanguage(lang.code)}
+                    disabled={savingLang}
+                    className={`flex-1 flex flex-col items-center py-2.5 rounded-xl border text-sm font-medium transition-colors disabled:opacity-60 ${
+                      (profile?.language ?? 'en') === lang.code
+                        ? 'bg-emerald-500 text-white border-emerald-500'
+                        : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
+                    }`}
+                  >
+                    <span className="text-xl">{lang.flag}</span>
+                    <span className="text-xs mt-0.5">{lang.label}</span>
+                  </button>
+                ))}
               </div>
             </div>
 

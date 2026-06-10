@@ -42,6 +42,7 @@ export default function SetupPage() {
           display_name: meta.display_name,
           household_id: meta.household_id,
           role: meta.role ?? 'child',
+          language: 'en',
         })
       })
   }, [isJoining, user, profile])
@@ -89,7 +90,7 @@ export default function SetupPage() {
     if (profileError) {
       if (profileError.code === '23505') {
         // Profile already exists from a previous attempt — still good, proceed
-        applyProfile({ display_name: displayName.trim(), household_id: householdId, role: 'parent' })
+        applyProfile({ display_name: displayName.trim(), household_id: householdId, role: 'parent', language: 'en' })
         return
       }
       setError(`${profileError.message} [${profileError.code}]`)
@@ -97,7 +98,7 @@ export default function SetupPage() {
       return
     }
 
-    applyProfile({ display_name: displayName.trim(), household_id: householdId, role: 'parent' })
+    applyProfile({ display_name: displayName.trim(), household_id: householdId, role: 'parent', language: 'en' })
   }
 
   if (isJoining) {

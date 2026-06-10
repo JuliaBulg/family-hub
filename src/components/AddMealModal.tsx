@@ -139,7 +139,7 @@ export default function AddMealModal({ date, meal, onClose, onSaved }: Props) {
         const res = await fetch('/api/meal-ingredients', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ mealName: name.trim(), servings, pantryItems: pantryItems ?? [] }),
+          body: JSON.stringify({ mealName: name.trim(), servings, pantryItems: pantryItems ?? [], language: profile?.language ?? 'en' }),
         })
         const json = await res.json()
         if (!res.ok || json.error) throw new Error()
