@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
+import { useT } from '@/lib/i18n'
 
 type Slot = 'breakfast' | 'lunch' | 'dinner'
 
@@ -16,23 +17,24 @@ interface Props {
   onPlanned: () => void
 }
 
-const SLOTS: { value: Slot; label: string; emoji: string }[] = [
-  { value: 'breakfast', label: 'Breakfast', emoji: '🌅' },
-  { value: 'lunch',     label: 'Lunch',     emoji: '☀️'  },
-  { value: 'dinner',    label: 'Dinner',    emoji: '🌙' },
-]
-
 function todayStr() {
   return new Date().toISOString().split('T')[0]
 }
 
 export default function PlanRecipeModal({ meal, onClose, onPlanned }: Props) {
   const { profile } = useAuth()
+  const t = useT()
   const [date, setDate]         = useState(todayStr())
   const [slot, setSlot]         = useState<Slot>('dinner')
   const [servings, setServings] = useState(4)
   const [loading, setLoading]   = useState(false)
   const [done, setDone]         = useState(false)
+
+  const SLOTS = [
+    { value: 'breakfast' as Slot, label: t('slot_breakfast'), emoji: '🌅' },
+    { value: 'lunch'     as Slot, label: t('slot_lunch'),     emoji: '☀️'  },
+    { value: 'dinner'    as Slot, label: t('slot_dinner'),    emoji: '🌙' },
+  ]
 
   async function handlePlan() {
     setLoading(true)
@@ -55,7 +57,6 @@ export default function PlanRecipeModal({ meal, onClose, onPlanned }: Props) {
     const { data: pantryItems } = await supabase.from('pantry_items').select('id, name')
 
     if (meal.id) {
-      // From Recipes tab — load stored recipe_ingredients with quantities
       const { data: recipeIngs } = await supabase
         .from('recipe_ingredients')
         .select('name, quantity, unit')
@@ -81,7 +82,6 @@ export default function PlanRecipeModal({ meal, onClose, onPlanned }: Props) {
         )
       }
     } else if (meal.keyIngredients && meal.keyIngredients.length > 0) {
-      // From Cook Tonight — key_ingredients are names only (no quantities)
       await supabase.from('meal_ingredients').insert(
         meal.keyIngredients.map(name => {
           const lower = name.toLowerCase()
@@ -118,7 +118,7 @@ export default function PlanRecipeModal({ meal, onClose, onPlanned }: Props) {
 
         <div className="flex-shrink-0 px-6 pt-2 pb-3 flex items-center justify-between">
           <div>
-            <h2 className="text-xl font-bold text-slate-800">📅 Plan this meal</h2>
+            <h2 className="text-xl font-bold text-slate-800">{t('plan_title')}</h2>
             <p className="text-xs text-slate-400 mt-0.5 truncate max-w-[220px]">{meal.name}</p>
           </div>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600 text-2xl leading-none">✕</button>
@@ -126,7 +126,7 @@ export default function PlanRecipeModal({ meal, onClose, onPlanned }: Props) {
 
         <div className="flex-1 min-h-0 overflow-y-auto px-6 pb-4 space-y-5">
           <div>
-            <label className="text-sm font-medium text-slate-600 mb-1 block">Date</label>
+            <label className="text-sm font-medium text-slate-600 mb-1 block">{t('plan_date')}</label>
             <input
               type="date"
               value={date}
@@ -136,7 +136,7 @@ export default function PlanRecipeModal({ meal, onClose, onPlanned }: Props) {
           </div>
 
           <div>
-            <label className="text-sm font-medium text-slate-600 mb-2 block">Meal slot</label>
+            <label className="text-sm font-medium text-slate-600 mb-2 block">{t('plan_slot')}</label>
             <div className="grid grid-cols-3 gap-2">
               {SLOTS.map(s => (
                 <button
@@ -156,7 +156,7 @@ export default function PlanRecipeModal({ meal, onClose, onPlanned }: Props) {
           </div>
 
           <div>
-            <label className="text-sm font-medium text-slate-600 mb-2 block">Servings</label>
+            <label className="text-sm font-medium text-slate-600 mb-2 block">{t('plan_servings')}</label>
             <div className="flex items-center gap-4">
               <button
                 onClick={() => setServings(s => Math.max(1, s - 1))}
@@ -171,7 +171,7 @@ export default function PlanRecipeModal({ meal, onClose, onPlanned }: Props) {
               >
                 +
               </button>
-              <span className="text-sm text-slate-400">people</span>
+              <span className="text-sm text-slate-400">{t('people')}</span>
             </div>
           </div>
         </div>
@@ -182,7 +182,7 @@ export default function PlanRecipeModal({ meal, onClose, onPlanned }: Props) {
             disabled={loading || done}
             className="w-full py-4 bg-emerald-500 hover:bg-emerald-600 disabled:bg-slate-300 text-white font-semibold rounded-2xl text-base transition-colors"
           >
-            {done ? '✅ Added to Menu!' : loading ? 'Planning…' : '📅 Add to Menu'}
+            {done ? t('plan_done') : loading ? t('plan_saving') : t('plan_btn')}
           </button>
         </div>
       </div>

@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
+import { useT } from '@/lib/i18n'
 
 type Slot = 'breakfast' | 'lunch' | 'dinner'
 
@@ -28,14 +29,16 @@ interface Props {
   onSaved: () => void
 }
 
-const SLOTS: { value: Slot; label: string; emoji: string }[] = [
-  { value: 'breakfast', label: 'Breakfast', emoji: '🌅' },
-  { value: 'lunch',     label: 'Lunch',     emoji: '☀️'  },
-  { value: 'dinner',    label: 'Dinner',    emoji: '🌙' },
-]
-
 export default function AddMealModal({ date, meal, onClose, onSaved }: Props) {
   const { profile } = useAuth()
+  const t = useT()
+
+  const SLOTS = [
+    { value: 'breakfast' as Slot, label: t('slot_breakfast'), emoji: '🌅' },
+    { value: 'lunch'     as Slot, label: t('slot_lunch'),     emoji: '☀️'  },
+    { value: 'dinner'    as Slot, label: t('slot_dinner'),    emoji: '🌙' },
+  ]
+
   const [mealDate, setMealDate] = useState(meal?.date ?? date)
   const [slot, setSlot]         = useState<Slot>(meal?.slot ?? 'dinner')
   const [name, setName]         = useState(meal?.name ?? '')
@@ -196,8 +199,8 @@ export default function AddMealModal({ date, meal, onClose, onSaved }: Props) {
         >
           <div className="flex-shrink-0 px-6 pt-8 pb-3 flex items-center justify-between">
             <div>
-              <h2 className="text-xl font-bold text-slate-800">🧑‍🍳 Ingredients</h2>
-              <p className="text-xs text-slate-400 mt-0.5">{savedMealName} · {servings} {servings === 1 ? 'person' : 'people'}</p>
+              <h2 className="text-xl font-bold text-slate-800">{t('meal_ingredients_title')}</h2>
+              <p className="text-xs text-slate-400 mt-0.5">{savedMealName} · {servings} {t('people')}</p>
             </div>
             <button onClick={onSaved} className="text-slate-400 hover:text-slate-600 text-2xl leading-none">✕</button>
           </div>
@@ -212,7 +215,7 @@ export default function AddMealModal({ date, meal, onClose, onSaved }: Props) {
                     <p className="text-xs text-slate-400">{[ing.quantity, ing.unit].filter(Boolean).join(' ')}</p>
                   )}
                 </div>
-                <span className="text-xs text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full flex-shrink-0">In pantry</span>
+                <span className="text-xs text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full flex-shrink-0">{t('meal_in_pantry')}</span>
               </div>
             ))}
             {missing.map(ing => (
@@ -224,7 +227,7 @@ export default function AddMealModal({ date, meal, onClose, onSaved }: Props) {
                     <p className="text-xs text-slate-400">{[ing.quantity, ing.unit].filter(Boolean).join(' ')}</p>
                   )}
                 </div>
-                <span className="text-xs text-red-500 bg-red-50 px-2 py-0.5 rounded-full flex-shrink-0">Missing</span>
+                <span className="text-xs text-red-500 bg-red-50 px-2 py-0.5 rounded-full flex-shrink-0">{t('meal_missing')}</span>
               </div>
             ))}
             {ingredients.length === 0 && (
@@ -239,17 +242,17 @@ export default function AddMealModal({ date, meal, onClose, onSaved }: Props) {
                 disabled={addingToShop}
                 className="w-full py-3.5 bg-slate-800 hover:bg-slate-700 disabled:bg-slate-300 text-white font-semibold rounded-2xl text-sm transition-colors"
               >
-                {addingToShop ? 'Adding…' : `🛒 Add ${missing.length} missing to shopping list`}
+                {addingToShop ? t('meal_adding') : `🛒 ${t('meal_add_missing_shop').replace('🛒 ', '')} (${missing.length})`}
               </button>
             )}
             {shopAdded && (
-              <p className="text-center text-sm text-emerald-600 font-medium py-1">✓ Added to shopping list</p>
+              <p className="text-center text-sm text-emerald-600 font-medium py-1">{t('meal_added_shop')}</p>
             )}
             <button
               onClick={onSaved}
               className="w-full py-3.5 bg-emerald-500 hover:bg-emerald-600 text-white font-semibold rounded-2xl text-sm transition-colors"
             >
-              Done
+              {t('btn_done')}
             </button>
           </div>
         </div>
@@ -265,13 +268,13 @@ export default function AddMealModal({ date, meal, onClose, onSaved }: Props) {
         onClick={e => e.stopPropagation()}
       >
         <div className="flex-shrink-0 px-6 pt-8 pb-3 flex items-center justify-between">
-          <h2 className="text-xl font-bold text-slate-800">{meal ? 'Edit Meal' : 'Add Meal'}</h2>
+          <h2 className="text-xl font-bold text-slate-800">{meal ? t('meal_edit_title') : t('meal_add_title')}</h2>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600 text-2xl leading-none">✕</button>
         </div>
 
         <div className="flex-1 overflow-y-auto px-6 space-y-5 pb-4">
           <div>
-            <label className="text-sm font-medium text-slate-600 mb-1 block">Date</label>
+            <label className="text-sm font-medium text-slate-600 mb-1 block">{t('meal_date_label')}</label>
             <input
               type="date"
               value={mealDate}
@@ -281,7 +284,7 @@ export default function AddMealModal({ date, meal, onClose, onSaved }: Props) {
           </div>
 
           <div>
-            <label className="text-sm font-medium text-slate-600 mb-2 block">Meal slot</label>
+            <label className="text-sm font-medium text-slate-600 mb-2 block">{t('meal_slot_label')}</label>
             <div className="grid grid-cols-3 gap-2">
               {SLOTS.map(s => (
                 <button
@@ -302,13 +305,13 @@ export default function AddMealModal({ date, meal, onClose, onSaved }: Props) {
 
           <div>
             <div className="flex items-center justify-between mb-1">
-              <label className="text-sm font-medium text-slate-600">Meal name</label>
+              <label className="text-sm font-medium text-slate-600">{t('meal_name_label')}</label>
               {!meal && (
                 <button
                   onClick={openRecipePicker}
                   className="text-xs font-medium text-emerald-600 hover:text-emerald-700"
                 >
-                  📖 Pick from recipes
+                  {t('meal_pick_recipe')}
                 </button>
               )}
             </div>
@@ -323,7 +326,7 @@ export default function AddMealModal({ date, meal, onClose, onSaved }: Props) {
                 type="text"
                 value={name}
                 onChange={e => setName(e.target.value)}
-                placeholder="e.g. Pasta Bolognese, Chicken soup…"
+                placeholder={t('meal_name_placeholder')}
                 autoFocus={!meal}
                 className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-400"
               />
@@ -332,7 +335,7 @@ export default function AddMealModal({ date, meal, onClose, onSaved }: Props) {
             {showRecipePicker && !selectedRecipeId && (
               <div className="mt-2 border border-slate-200 rounded-xl overflow-hidden bg-white shadow-sm">
                 {loadingRecipes ? (
-                  <p className="text-sm text-slate-400 px-4 py-3 animate-pulse">Loading…</p>
+                  <p className="text-sm text-slate-400 px-4 py-3 animate-pulse">{t('meal_pick_placeholder')}</p>
                 ) : recipeList.length === 0 ? (
                   <p className="text-sm text-slate-400 px-4 py-3">No recipes saved yet</p>
                 ) : (
@@ -353,7 +356,7 @@ export default function AddMealModal({ date, meal, onClose, onSaved }: Props) {
           </div>
 
           <div>
-            <label className="text-sm font-medium text-slate-600 mb-2 block">Servings</label>
+            <label className="text-sm font-medium text-slate-600 mb-2 block">{t('meal_servings_label')}</label>
             <div className="flex items-center gap-4">
               <button
                 onClick={() => setServings(s => Math.max(1, s - 1))}
@@ -368,7 +371,7 @@ export default function AddMealModal({ date, meal, onClose, onSaved }: Props) {
               >
                 +
               </button>
-              <span className="text-sm text-slate-400">people</span>
+              <span className="text-sm text-slate-400">{t('people')}</span>
             </div>
           </div>
 
@@ -381,7 +384,7 @@ export default function AddMealModal({ date, meal, onClose, onSaved }: Props) {
             disabled={loading || !name.trim()}
             className="w-full py-4 bg-emerald-500 hover:bg-emerald-600 disabled:bg-slate-300 text-white font-semibold rounded-2xl text-base transition-colors"
           >
-            {loading ? 'Saving & analysing…' : meal ? '✅ Save Changes' : '✅ Add Meal'}
+            {loading ? t('meal_saving') : meal ? t('meal_save_btn') : t('meal_add_btn')}
           </button>
         </div>
       </div>

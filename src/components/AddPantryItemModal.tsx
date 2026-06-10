@@ -3,17 +3,18 @@
 import { useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
+import { useT, useCatLabel } from '@/lib/i18n'
 
 type Category = 'food' | 'household' | 'drinks' | 'personal' | 'medicine' | 'pets' | 'other'
 
-const CATEGORIES: { value: Category; label: string; emoji: string }[] = [
-  { value: 'food',      label: 'Food & Groceries',    emoji: '🛒' },
-  { value: 'drinks',    label: 'Drinks & Extras',      emoji: '🥤' },
-  { value: 'household', label: 'Household',            emoji: '🧹' },
-  { value: 'personal',  label: 'Personal & Cosmetics', emoji: '🧴' },
-  { value: 'medicine',  label: 'Medicine & First Aid', emoji: '💊' },
-  { value: 'pets',      label: 'Pets & Animals',       emoji: '🐾' },
-  { value: 'other',     label: 'Everything Else',      emoji: '🧺' },
+const CAT_META: { value: Category; emoji: string }[] = [
+  { value: 'food',      emoji: '🛒' },
+  { value: 'drinks',    emoji: '🥤' },
+  { value: 'household', emoji: '🧹' },
+  { value: 'personal',  emoji: '🧴' },
+  { value: 'medicine',  emoji: '💊' },
+  { value: 'pets',      emoji: '🐾' },
+  { value: 'other',     emoji: '🧺' },
 ]
 
 interface EditItem {
@@ -33,6 +34,8 @@ interface Props {
 
 export default function AddPantryItemModal({ onClose, onAdded, editItem }: Props) {
   const { profile } = useAuth()
+  const t = useT()
+  const catLabel = useCatLabel()
   const [name, setName]           = useState(editItem?.name ?? '')
   const [category, setCategory]   = useState<Category>(editItem?.category ?? 'food')
   const [quantity, setQuantity]   = useState(editItem?.quantity ?? '')
@@ -97,32 +100,31 @@ export default function AddPantryItemModal({ onClose, onAdded, editItem }: Props
         style={{ height: '100dvh' }}
         onClick={(e) => e.stopPropagation()}
       >
-
-        {/* Header */}
         <div className="flex-shrink-0 px-6 pt-8 pb-3 flex items-center justify-between">
-          <h2 className="text-xl font-bold text-slate-800">{editItem ? 'Edit Item' : 'Add to Pantry'}</h2>
+          <h2 className="text-xl font-bold text-slate-800">
+            {editItem ? t('pmodal_edit_title') : t('pmodal_add_title')}
+          </h2>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600 text-2xl leading-none">✕</button>
         </div>
 
-        {/* Form fields */}
         <div className="flex-1 min-h-0 overflow-y-scroll px-6 space-y-4 pb-4">
 
           <div>
-            <label className="text-sm font-medium text-slate-600 mb-1 block">Item name *</label>
+            <label className="text-sm font-medium text-slate-600 mb-1 block">{t('pmodal_name')} *</label>
             <input
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="e.g. Pasta, Milk, Shampoo…"
+              placeholder={t('pmodal_name_placeholder')}
               className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-400"
               autoFocus
             />
           </div>
 
           <div>
-            <label className="text-sm font-medium text-slate-600 mb-1 block">Category *</label>
+            <label className="text-sm font-medium text-slate-600 mb-1 block">{t('pmodal_category')} *</label>
             <div className="grid grid-cols-2 gap-2">
-              {CATEGORIES.map((cat) => (
+              {CAT_META.map((cat) => (
                 <button
                   key={cat.value}
                   type="button"
@@ -134,7 +136,7 @@ export default function AddPantryItemModal({ onClose, onAdded, editItem }: Props
                   }`}
                 >
                   <span>{cat.emoji}</span>
-                  <span className="truncate">{cat.label}</span>
+                  <span className="truncate">{catLabel(cat.value)}</span>
                 </button>
               ))}
             </div>
@@ -142,29 +144,31 @@ export default function AddPantryItemModal({ onClose, onAdded, editItem }: Props
 
           <div className="flex gap-3">
             <div className="flex-1">
-              <label className="text-sm font-medium text-slate-600 mb-1 block">Quantity</label>
+              <label className="text-sm font-medium text-slate-600 mb-1 block">{t('pmodal_quantity')}</label>
               <input
                 type="text"
                 value={quantity}
                 onChange={(e) => setQuantity(e.target.value)}
-                placeholder="e.g. 2, 500"
+                placeholder={t('pmodal_qty_placeholder')}
                 className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-400"
               />
             </div>
             <div className="w-28">
-              <label className="text-sm font-medium text-slate-600 mb-1 block">Unit</label>
+              <label className="text-sm font-medium text-slate-600 mb-1 block">{t('pmodal_unit')}</label>
               <input
                 type="text"
                 value={unit}
                 onChange={(e) => setUnit(e.target.value)}
-                placeholder="g, L, pcs"
+                placeholder={t('pmodal_unit_placeholder')}
                 className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-400"
               />
             </div>
           </div>
 
           <div>
-            <label className="text-sm font-medium text-slate-600 mb-1 block">Expiry date (optional)</label>
+            <label className="text-sm font-medium text-slate-600 mb-1 block">
+              {t('pmodal_expiry')} <span className="text-slate-400 font-normal">{t('pmodal_expiry_optional')}</span>
+            </label>
             <input
               type="date"
               value={expiryDate}
@@ -177,7 +181,6 @@ export default function AddPantryItemModal({ onClose, onAdded, editItem }: Props
 
         </div>
 
-        {/* Pinned button */}
         <div className="flex-shrink-0 px-6 py-4 bg-white border-t border-slate-100">
           <button
             type="button"
@@ -185,7 +188,7 @@ export default function AddPantryItemModal({ onClose, onAdded, editItem }: Props
             disabled={loading || !name.trim()}
             className="w-full py-4 bg-emerald-500 hover:bg-emerald-600 active:bg-emerald-700 disabled:bg-slate-300 text-white font-semibold rounded-2xl text-base transition-colors"
           >
-            {loading ? 'Saving…' : editItem ? '✅ Save Changes' : '✅ Add to Pantry'}
+            {loading ? t('saving') : editItem ? t('pmodal_update_btn') : t('pmodal_save_btn')}
           </button>
         </div>
 

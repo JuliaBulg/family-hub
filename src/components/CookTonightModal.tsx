@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
 import PlanRecipeModal from '@/components/PlanRecipeModal'
+import { useT } from '@/lib/i18n'
 
 interface PantryItem {
   name: string
@@ -27,6 +28,7 @@ interface Props {
 
 export default function CookTonightModal({ items, onClose }: Props) {
   const { profile } = useAuth()
+  const t = useT()
   const [servings, setServings]       = useState(4)
   const [maxMinutes, setMaxMinutes]   = useState<number | null>(45)
   const [vegetarian, setVegetarian]   = useState(false)
@@ -42,9 +44,9 @@ export default function CookTonightModal({ items, onClose }: Props) {
   const [planSuggestion, setPlanSuggestion] = useState<Suggestion | null>(null)
 
   const TIME_PRESETS = [
-    { label: '⚡ Quick',   sub: '≤ 25 min',  minutes: 25  },
-    { label: '🕐 Normal',  sub: '≤ 45 min',  minutes: 45  },
-    { label: '🍲 No rush', sub: 'any time',  minutes: null },
+    { label: t('cook_quick'),   sub: t('cook_quick_sub'),   minutes: 25   },
+    { label: t('cook_normal'),  sub: t('cook_normal_sub'),  minutes: 45   },
+    { label: t('cook_no_rush'), sub: t('cook_no_rush_sub'), minutes: null },
   ]
 
   async function getSuggestions() {
@@ -113,34 +115,32 @@ export default function CookTonightModal({ items, onClose }: Props) {
           style={{ maxHeight: '85dvh' }}
           onClick={e => e.stopPropagation()}
         >
-          {/* Handle */}
           <div className="flex-shrink-0 pt-3 pb-1 flex justify-center">
             <div className="w-10 h-1 bg-slate-200 rounded-full" />
           </div>
 
           <div className="flex-shrink-0 px-6 pt-2 pb-3 flex items-center justify-between">
             <div>
-              <h2 className="text-xl font-bold text-slate-800">🍽️ What to cook tonight?</h2>
-              <p className="text-xs text-slate-400 mt-0.5">Based on what&apos;s in your pantry</p>
+              <h2 className="text-xl font-bold text-slate-800">🍽️ {t('cook_title')}</h2>
+              <p className="text-xs text-slate-400 mt-0.5">{t('cook_subtitle')}</p>
             </div>
             <button onClick={onClose} className="text-slate-400 hover:text-slate-600 text-2xl leading-none">✕</button>
           </div>
 
           <div className="flex-1 min-h-0 overflow-y-auto px-6 pb-6">
 
-            {/* Step 1 — settings */}
             {!loading && !done && (
               <div className="pt-2">
                 {items.length === 0 ? (
                   <div className="text-center py-12 text-slate-400">
                     <p className="text-3xl mb-3">🛒</p>
-                    <p className="text-sm font-medium">Your pantry is empty</p>
-                    <p className="text-xs mt-1">Add some items to get recipe suggestions</p>
+                    <p className="text-sm font-medium">{t('cook_empty')}</p>
+                    <p className="text-xs mt-1">{t('cook_empty_sub')}</p>
                   </div>
                 ) : (
                   <div className="space-y-6">
                     <div>
-                      <p className="text-sm font-medium text-slate-700 mb-3">How many people are you cooking for?</p>
+                      <p className="text-sm font-medium text-slate-700 mb-3">{t('cook_servings_q')}</p>
                       <div className="flex items-center gap-4">
                         <button
                           onClick={() => setServings(s => Math.max(1, s - 1))}
@@ -155,12 +155,12 @@ export default function CookTonightModal({ items, onClose }: Props) {
                         >
                           +
                         </button>
-                        <span className="text-sm text-slate-400">people</span>
+                        <span className="text-sm text-slate-400">{t('people')}</span>
                       </div>
                     </div>
 
                     <div>
-                      <p className="text-sm font-medium text-slate-700 mb-2">How much time do you have?</p>
+                      <p className="text-sm font-medium text-slate-700 mb-2">{t('cook_time_q')}</p>
                       <div className="grid grid-cols-3 gap-2">
                         {TIME_PRESETS.map(p => (
                           <button
@@ -179,7 +179,6 @@ export default function CookTonightModal({ items, onClose }: Props) {
                       </div>
                     </div>
 
-                    {/* Vegetarian toggle */}
                     <button
                       onClick={() => setVegetarian(v => !v)}
                       className={`w-full flex items-center justify-between px-4 py-3 rounded-xl border transition-colors ${
@@ -188,7 +187,7 @@ export default function CookTonightModal({ items, onClose }: Props) {
                           : 'bg-slate-50 border-slate-200 text-slate-600'
                       }`}
                     >
-                      <span className="text-sm font-medium">🥦 Vegetarian only</span>
+                      <span className="text-sm font-medium">{t('cook_vegetarian')}</span>
                       <span className={`w-10 h-6 rounded-full transition-colors flex items-center px-0.5 ${vegetarian ? 'bg-green-500' : 'bg-slate-300'}`}>
                         <span className={`w-5 h-5 rounded-full bg-white shadow transition-transform ${vegetarian ? 'translate-x-4' : 'translate-x-0'}`} />
                       </span>
@@ -199,27 +198,25 @@ export default function CookTonightModal({ items, onClose }: Props) {
                       onClick={getSuggestions}
                       className="w-full py-4 bg-emerald-500 hover:bg-emerald-600 active:bg-emerald-700 text-white font-semibold rounded-2xl text-base transition-colors"
                     >
-                      ✨ Get suggestions
+                      {t('cook_get')}
                     </button>
                   </div>
                 )}
               </div>
             )}
 
-            {/* Loading */}
             {loading && (
               <div className="flex flex-col items-center justify-center py-16 gap-3">
                 <p className="text-3xl animate-bounce">🤔</p>
-                <p className="text-slate-500 text-sm animate-pulse">Thinking about what you can cook for {servings}…</p>
+                <p className="text-slate-500 text-sm animate-pulse">{t('cook_thinking')} {servings}…</p>
               </div>
             )}
 
-            {/* Suggestions */}
             {done && !loading && (
               <div className="space-y-4 pt-1">
                 <p className="text-xs text-slate-400">
-                  Suggestions for {servings} {servings === 1 ? 'person' : 'people'}
-                  {vegetarian && ' · 🥦 Vegetarian'}
+                  {t('cook_suggestions_for')} {servings} {servings === 1 ? t('person') : t('people')}
+                  {vegetarian && t('cook_vegetarian_badge')}
                 </p>
                 {suggestions.map((s, i) => (
                   <div key={i} className="bg-slate-50 border border-slate-100 rounded-2xl p-4">
@@ -253,7 +250,6 @@ export default function CookTonightModal({ items, onClose }: Props) {
                       </div>
                     )}
 
-                    {/* Action buttons */}
                     <div className="flex flex-wrap gap-2 justify-end mt-1">
                       {s.missing.length > 0 && (
                         <button
@@ -265,14 +261,14 @@ export default function CookTonightModal({ items, onClose }: Props) {
                               : 'text-slate-600 bg-white border border-slate-200 hover:bg-slate-50'
                           }`}
                         >
-                          {addedToShop.has(i) ? '✓ Added to list' : addingToShop === i ? '…' : '🛒 Add missing'}
+                          {addedToShop.has(i) ? t('cook_added_to_list') : addingToShop === i ? '…' : t('cook_add_missing')}
                         </button>
                       )}
                       <button
                         onClick={() => setPlanSuggestion(s)}
                         className="text-xs font-medium text-emerald-600 bg-emerald-50 hover:bg-emerald-100 px-3 py-1.5 rounded-lg transition-colors"
                       >
-                        📅 Plan this
+                        {t('cook_plan')}
                       </button>
                       <button
                         onClick={() => saveToRecipes(s, i)}
@@ -283,7 +279,7 @@ export default function CookTonightModal({ items, onClose }: Props) {
                             : 'text-slate-500 bg-white border border-slate-200 hover:bg-slate-50'
                         }`}
                       >
-                        {saved.has(i) ? '✓ Saved' : saving === i ? '…' : '♡ Save'}
+                        {saved.has(i) ? t('cook_saved') : saving === i ? '…' : t('cook_save')}
                       </button>
                     </div>
                   </div>

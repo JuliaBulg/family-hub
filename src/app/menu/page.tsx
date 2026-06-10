@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
 import AddMealModal from '@/components/AddMealModal'
 import MarkCookedModal from '@/components/MarkCookedModal'
+import { useT } from '@/lib/i18n'
 
 type Slot = 'breakfast' | 'lunch' | 'dinner'
 
@@ -45,6 +46,7 @@ function isToday(date: Date): boolean {
 
 export default function MenuPage() {
   const { profile } = useAuth()
+  const t = useT()
   const [weekOffset, setWeekOffset]       = useState(0)
   const [meals, setMeals]                 = useState<Meal[]>([])
   const [addingForDate, setAddingForDate] = useState<string | null>(null)
@@ -52,17 +54,25 @@ export default function MenuPage() {
   const [cookMeal, setCookMeal]           = useState<Meal | null>(null)
   const [addingMissing, setAddingMissing] = useState<string | null>(null)
 
+  function slotLabel(slot: Slot) {
+    if (slot === 'breakfast') return t('slot_breakfast')
+    if (slot === 'lunch') return t('slot_lunch')
+    return t('slot_dinner')
+  }
+
   const fetchMeals = useCallback(async () => {
+    if (!profile?.household_id) return
     const days = getWeekDays(weekOffset)
     const from = toDateStr(days[0])
     const to   = toDateStr(days[6])
     const { data } = await supabase
       .from('meals')
       .select('*')
+      .eq('household_id', profile.household_id)
       .gte('date', from)
       .lte('date', to)
     setMeals(data ?? [])
-  }, [weekOffset])
+  }, [weekOffset, profile?.household_id])
 
   useEffect(() => { fetchMeals() }, [fetchMeals])
 
@@ -97,14 +107,13 @@ export default function MenuPage() {
   }
 
   const days      = getWeekDays(weekOffset)
-  const weekLabel = weekOffset === 0 ? 'This Week' : 'Next Week'
+  const weekLabel = weekOffset === 0 ? t('menu_this_week') : t('menu_next_week')
   const weekRange = `${days[0].toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })} – ${days[6].toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}`
 
   return (
     <div className="flex flex-col min-h-full">
       <div className="flex-1 px-4 pt-4 pb-4">
 
-        {/* Header + week navigation */}
         <div className="flex items-center justify-between mb-4">
           <button
             onClick={() => { setWeekOffset(0); setMeals([]) }}
@@ -126,7 +135,6 @@ export default function MenuPage() {
           </button>
         </div>
 
-        {/* Day cards */}
         <div className="space-y-2">
           {days.map(day => {
             const dateStr  = toDateStr(day)
@@ -142,25 +150,23 @@ export default function MenuPage() {
                   today ? 'border-emerald-300 bg-emerald-50/40' : 'border-slate-100 bg-white'
                 }`}
               >
-                {/* Day header */}
                 <div className="flex items-center justify-between px-4 py-2.5">
                   <div className="flex items-center gap-2">
                     <p className={`text-sm font-semibold ${today ? 'text-emerald-700' : 'text-slate-700'}`}>
                       {day.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}
                     </p>
                     {today && (
-                      <span className="text-xs bg-emerald-500 text-white px-1.5 py-0.5 rounded-full font-medium">Today</span>
+                      <span className="text-xs bg-emerald-500 text-white px-1.5 py-0.5 rounded-full font-medium">{t('today_label')}</span>
                     )}
                   </div>
                   <button
                     onClick={() => setAddingForDate(dateStr)}
                     className="text-xs font-semibold text-emerald-600 bg-emerald-50 hover:bg-emerald-100 px-2.5 py-1 rounded-lg transition-colors"
                   >
-                    + Add
+                    {t('menu_add_btn')}
                   </button>
                 </div>
 
-                {/* Meals */}
                 {dayMeals.length > 0 ? (
                   <div className="border-t border-slate-100 divide-y divide-slate-50">
                     {dayMeals.map(meal => (
@@ -172,8 +178,8 @@ export default function MenuPage() {
                               {meal.name}
                             </p>
                             <p className="text-xs text-slate-400">
-                              {meal.slot.charAt(0).toUpperCase() + meal.slot.slice(1)} · {meal.servings} serving{meal.servings !== 1 ? 's' : ''}
-                              {meal.cooked_at && ' · ✅ Cooked'}
+                              {slotLabel(meal.slot)} · {meal.servings} {meal.servings === 1 ? t('serving_label') : t('servings_label')}
+                              {meal.cooked_at && t('menu_cooked_badge')}
                             </p>
                           </div>
                           <button
@@ -190,7 +196,6 @@ export default function MenuPage() {
                           </button>
                         </div>
 
-                        {/* Action buttons — only for uncooked meals */}
                         {!meal.cooked_at && (
                           <div className="flex gap-2 mt-2 ml-8">
                             <button
@@ -198,13 +203,13 @@ export default function MenuPage() {
                               disabled={addingMissing === meal.id}
                               className="text-xs font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 disabled:opacity-50 px-2.5 py-1 rounded-lg transition-colors"
                             >
-                              {addingMissing === meal.id ? '…' : '🛒 Add missing'}
+                              {addingMissing === meal.id ? '…' : t('menu_add_missing')}
                             </button>
                             <button
                               onClick={() => setCookMeal(meal)}
                               className="text-xs font-medium text-emerald-600 bg-emerald-50 hover:bg-emerald-100 px-2.5 py-1 rounded-lg transition-colors"
                             >
-                              ✅ Cooked
+                              {t('menu_cooked_btn')}
                             </button>
                           </div>
                         )}
@@ -213,7 +218,7 @@ export default function MenuPage() {
                   </div>
                 ) : (
                   <div className="border-t border-slate-50 px-4 py-2">
-                    <p className="text-xs text-slate-400 italic">No meals planned</p>
+                    <p className="text-xs text-slate-400 italic">{t('menu_no_meals')}</p>
                   </div>
                 )}
               </div>

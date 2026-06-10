@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
 import { CATEGORIES, type Category } from '@/lib/categories'
+import { useCatLabel } from '@/lib/i18n'
 
 interface Props {
   onClose: () => void
@@ -12,6 +13,7 @@ interface Props {
 
 export default function AddExpenseModal({ onClose, onAdded }: Props) {
   const { profile } = useAuth()
+  const catLabel = useCatLabel()
   const [amount, setAmount]       = useState('')
   const [category, setCategory]   = useState<Category | null>(null)
   const [store, setStore]         = useState('')
@@ -57,7 +59,6 @@ export default function AddExpenseModal({ onClose, onAdded }: Props) {
         </div>
 
         <div className="space-y-4">
-          {/* Amount */}
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Amount (€)</label>
             <input
@@ -71,7 +72,6 @@ export default function AddExpenseModal({ onClose, onAdded }: Props) {
             />
           </div>
 
-          {/* Category */}
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-2">Category</label>
             <div className="grid grid-cols-2 gap-2">
@@ -87,13 +87,12 @@ export default function AddExpenseModal({ onClose, onAdded }: Props) {
                   }`}
                 >
                   <span>{cat.emoji}</span>
-                  <span className="truncate">{cat.label}</span>
+                  <span className="truncate">{catLabel(cat.value)}</span>
                 </button>
               ))}
             </div>
           </div>
 
-          {/* Store (optional) */}
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Store <span className="text-slate-400 font-normal">(optional)</span></label>
             <input
@@ -105,7 +104,6 @@ export default function AddExpenseModal({ onClose, onAdded }: Props) {
             />
           </div>
 
-          {/* Note (optional) */}
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Note <span className="text-slate-400 font-normal">(optional)</span></label>
             <input
@@ -117,7 +115,6 @@ export default function AddExpenseModal({ onClose, onAdded }: Props) {
             />
           </div>
 
-          {/* Date */}
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Date</label>
             <input

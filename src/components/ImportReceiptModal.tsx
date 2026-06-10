@@ -4,6 +4,7 @@ import { useState, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
 import { CATEGORIES, type Category } from '@/lib/categories'
+import { useCatLabel } from '@/lib/i18n'
 
 type Step = 'input' | 'parsing' | 'review' | 'expense'
 type Tab  = 'photo' | 'text'
@@ -24,6 +25,7 @@ interface Props {
 
 export default function ImportReceiptModal({ onClose, onAdded }: Props) {
   const { profile } = useAuth()
+  const catLabel = useCatLabel()
 
   const [step, setStep]                 = useState<Step>('input')
   const [tab, setTab]                   = useState<Tab>('photo')
@@ -73,7 +75,7 @@ export default function ImportReceiptModal({ onClose, onAdded }: Props) {
       const res = await fetch('/api/parse-receipt', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
+        body: JSON.stringify({ ...body, language: profile?.language ?? 'en' }),
       })
       if (!res.ok) { const j = await res.json(); throw new Error(j.error ?? 'Server error') }
 
@@ -332,7 +334,7 @@ export default function ImportReceiptModal({ onClose, onAdded }: Props) {
                             <button key={c.value} onClick={() => updateCategory(idx, c.value)}
                               className={`px-2 py-0.5 rounded-full text-xs font-medium transition-colors ${item.category === c.value ? 'bg-emerald-500 text-white' : 'bg-slate-100 text-slate-500'}`}
                             >
-                              {c.emoji} {c.label}
+                              {c.emoji} {catLabel(c.value)}
                             </button>
                           ))}
                         </div>
@@ -356,7 +358,7 @@ export default function ImportReceiptModal({ onClose, onAdded }: Props) {
                 return (
                   <div key={catValue} className="flex items-center gap-3">
                     <span className="text-xl flex-shrink-0">{cat.emoji}</span>
-                    <p className="flex-1 text-sm font-medium text-slate-700 truncate">{cat.label}</p>
+                    <p className="flex-1 text-sm font-medium text-slate-700 truncate">{catLabel(cat.value)}</p>
                     <div className="flex items-center border border-slate-200 rounded-xl overflow-hidden w-28 flex-shrink-0">
                       <span className="px-2 text-slate-400 text-sm">€</span>
                       <input

@@ -16,13 +16,22 @@ For each item return:
 Return ONLY valid JSON, no other text:
 {"items":[{"name":"Pasta","category":"food","quantity":"500","unit":"g","price":1.29,"estimated_expiry_days":null}]}`
 
+const LANGUAGE_INSTRUCTION: Record<string, string> = {
+  et: 'IMPORTANT: All item names must be in Estonian (eesti keel). Translate every product name to Estonian.',
+  ru: 'IMPORTANT: All item names must be in Russian (на русском языке). Translate every product name to Russian.',
+}
+
 export async function POST(req: NextRequest) {
   const body = await req.json()
-  const { type, data, mediaType } = body as {
+  const { type, data, mediaType, language } = body as {
     type: 'image' | 'pdf' | 'text'
     data: string
     mediaType?: string
+    language?: string
   }
+
+  const langNote = language && LANGUAGE_INSTRUCTION[language] ? `\n\n${LANGUAGE_INSTRUCTION[language]}` : ''
+  const systemPrompt = SYSTEM_PROMPT + langNote
 
   let content: Anthropic.Messages.MessageParam['content']
 
@@ -58,7 +67,7 @@ export async function POST(req: NextRequest) {
   const message = await client.messages.create({
     model: 'claude-opus-4-7',
     max_tokens: 8096,
-    system: SYSTEM_PROMPT,
+    system: systemPrompt,
     messages: [{ role: 'user', content }],
   })
 

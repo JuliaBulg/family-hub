@@ -6,6 +6,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import AddRecipeModal from '@/components/AddRecipeModal'
 import PlanRecipeModal from '@/components/PlanRecipeModal'
 import { FAMILY_RECIPES_PRELOAD } from '@/lib/family-recipes'
+import { useT } from '@/lib/i18n'
 
 interface RecipeIngredient {
   id: string
@@ -24,14 +25,16 @@ interface Recipe {
   ingredients: RecipeIngredient[]
 }
 
-const SOURCE_LABEL: Record<string, string> = {
-  preloaded: '📚 Family',
-  manual:    '✏️ Added',
-  ai:        '🤖 AI',
-}
-
 export default function RecipesPage() {
   const { profile } = useAuth()
+  const t = useT()
+
+  const SOURCE_LABEL: Record<string, string> = {
+    preloaded: t('recipes_source_family'),
+    manual:    t('recipes_source_manual'),
+    ai:        t('recipes_source_ai'),
+  }
+
   const [recipes, setRecipes]     = useState<Recipe[]>([])
   const [loading, setLoading]     = useState(true)
   const [expanded, setExpanded]   = useState<Set<string>>(new Set())
@@ -42,20 +45,24 @@ export default function RecipesPage() {
   const [query, setQuery]           = useState('')
 
   const fetchRecipes = useCallback(async () => {
+    if (!profile?.household_id) return
     const { data } = await supabase
       .from('recipes')
       .select('*, ingredients:recipe_ingredients(*)')
+      .eq('household_id', profile.household_id)
       .order('created_at', { ascending: true })
 
     setRecipes((data ?? []) as Recipe[])
     setLoading(false)
-  }, [])
+  }, [profile?.household_id])
 
   useEffect(() => {
+    if (!profile?.household_id) return
     async function init() {
       const { count } = await supabase
         .from('recipes')
         .select('id', { count: 'exact', head: true })
+        .eq('household_id', profile!.household_id)
 
       if (count === 0) {
         await preloadRecipes()
@@ -63,7 +70,7 @@ export default function RecipesPage() {
       await fetchRecipes()
     }
     init()
-  }, [fetchRecipes])
+  }, [fetchRecipes, profile?.household_id])
 
   async function preloadRecipes() {
     for (const r of FAMILY_RECIPES_PRELOAD) {
@@ -106,7 +113,7 @@ export default function RecipesPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-full py-24 text-slate-400 text-sm animate-pulse">
-        Loading recipes…
+        {t('loading')}
       </div>
     )
   }
@@ -115,21 +122,19 @@ export default function RecipesPage() {
     <div className="flex flex-col min-h-full">
       <div className="flex-1 px-4 pt-4 pb-4">
 
-        {/* Header */}
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h1 className="text-lg font-bold text-slate-800">📖 Recipes</h1>
-            <p className="text-xs text-slate-400">{recipes.length} saved</p>
+            <h1 className="text-lg font-bold text-slate-800">{t('recipes_title')}</h1>
+            <p className="text-xs text-slate-400">{recipes.length} {t('recipes_saved')}</p>
           </div>
           <button
             onClick={() => { setEditRecipe(null); setShowModal(true) }}
             className="flex items-center gap-1.5 bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-semibold px-4 py-2 rounded-xl transition-colors"
           >
-            + Add
+            {t('btn_add')}
           </button>
         </div>
 
-        {/* Search */}
         {recipes.length > 0 && (
           <div className="relative mb-3">
             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">🔍</span>
@@ -137,23 +142,22 @@ export default function RecipesPage() {
               type="text"
               value={query}
               onChange={e => setQuery(e.target.value)}
-              placeholder="Search recipes…"
+              placeholder={t('recipes_search')}
               className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-800 placeholder-slate-400 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
             />
           </div>
         )}
 
-        {/* Recipe list */}
         {recipes.length === 0 ? (
           <div className="text-center py-24 text-slate-400">
             <p className="text-4xl mb-3">📖</p>
-            <p className="text-sm font-medium">No recipes yet</p>
-            <p className="text-xs mt-1">Tap &quot;+ Add&quot; to save your first recipe</p>
+            <p className="text-sm font-medium">{t('recipes_empty')}</p>
+            <p className="text-xs mt-1">{t('recipes_empty_sub')}</p>
           </div>
         ) : (
           <div className="space-y-2">
             {recipes.filter(r => !query || r.name.toLowerCase().includes(query.toLowerCase())).length === 0 && (
-              <p className="text-sm text-slate-400 text-center py-8">No recipes match &ldquo;{query}&rdquo;</p>
+              <p className="text-sm text-slate-400 text-center py-8">{t('recipes_no_match')} &ldquo;{query}&rdquo;</p>
             )}
             {recipes.filter(r => !query || r.name.toLowerCase().includes(query.toLowerCase())).map(recipe => {
               const isOpen = expanded.has(recipe.id)
@@ -164,7 +168,6 @@ export default function RecipesPage() {
                   key={recipe.id}
                   className="bg-white border border-slate-100 rounded-2xl overflow-hidden"
                 >
-                  {/* Card header — tap to expand */}
                   <button
                     className="w-full flex items-center justify-between px-4 py-3.5 text-left"
                     onClick={() => toggleExpand(recipe.id)}
@@ -173,10 +176,10 @@ export default function RecipesPage() {
                       <p className="text-sm font-semibold text-slate-800 truncate">{recipe.name}</p>
                       <div className="flex items-center gap-2 mt-0.5">
                         <span className="text-xs text-slate-400">
-                          {ings.length} ingredient{ings.length !== 1 ? 's' : ''}
+                          {ings.length} {ings.length !== 1 ? t('recipes_ingredients') : t('recipes_ingredient')}
                         </span>
                         <span className="text-xs text-slate-300">·</span>
-                        <span className="text-xs text-slate-400">{SOURCE_LABEL[recipe.source] ?? '✏️ Added'}</span>
+                        <span className="text-xs text-slate-400">{SOURCE_LABEL[recipe.source] ?? t('recipes_source_manual')}</span>
                       </div>
                     </div>
                     <span className={`text-slate-400 text-sm transition-transform ${isOpen ? 'rotate-180' : ''}`}>
@@ -184,7 +187,6 @@ export default function RecipesPage() {
                     </span>
                   </button>
 
-                  {/* Expanded ingredients */}
                   {isOpen && (
                     <div className="border-t border-slate-50 px-4 pb-3">
                       {ings.length > 0 ? (
@@ -202,7 +204,7 @@ export default function RecipesPage() {
                           ))}
                         </div>
                       ) : (
-                        <p className="text-xs text-slate-400 pt-2">No ingredients listed</p>
+                        <p className="text-xs text-slate-400 pt-2">{t('recipes_no_ingredients')}</p>
                       )}
 
                       <div className="flex gap-2 mt-3 flex-wrap">
@@ -210,20 +212,20 @@ export default function RecipesPage() {
                           onClick={() => setPlanRecipe(recipe)}
                           className="text-xs font-medium text-emerald-600 bg-emerald-50 hover:bg-emerald-100 px-3 py-1.5 rounded-lg transition-colors"
                         >
-                          📅 Plan this meal
+                          {t('recipes_plan')}
                         </button>
                         <button
                           onClick={() => { setEditRecipe(recipe); setShowModal(true) }}
                           className="text-xs font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded-lg transition-colors"
                         >
-                          ✏️ Edit
+                          {t('recipes_edit')}
                         </button>
                         <button
                           onClick={() => deleteRecipe(recipe.id)}
                           disabled={deleting === recipe.id}
                           className="text-xs font-medium text-red-500 bg-red-50 hover:bg-red-100 disabled:opacity-50 px-3 py-1.5 rounded-lg transition-colors"
                         >
-                          {deleting === recipe.id ? '…' : '✕ Delete'}
+                          {deleting === recipe.id ? '…' : t('recipes_delete')}
                         </button>
                       </div>
                     </div>

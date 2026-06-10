@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
+import { useT } from '@/lib/i18n'
 
 interface Meal {
   id: string
@@ -26,6 +27,7 @@ interface Props {
 
 export default function MarkCookedModal({ meal, onClose, onCooked }: Props) {
   const { profile } = useAuth()
+  const t = useT()
   const [ingredients, setIngredients] = useState<Ingredient[]>([])
   const [checked, setChecked]         = useState<Set<string>>(new Set())
   const [loading, setLoading]         = useState(true)
@@ -77,7 +79,6 @@ export default function MarkCookedModal({ meal, onClose, onCooked }: Props) {
       .update({ cooked_at: new Date().toISOString() })
       .eq('id', meal.id)
 
-    // Update household context so pantry refreshes
     void profile
 
     setSaving(false)
@@ -86,6 +87,12 @@ export default function MarkCookedModal({ meal, onClose, onCooked }: Props) {
 
   const pantryLinked = ingredients.filter(i => i.pantry_item_id)
   const notLinked    = ingredients.filter(i => !i.pantry_item_id)
+
+  const btnLabel = saving
+    ? t('saving')
+    : checked.size > 0
+      ? t('cooked_btn_deduct').replace('{n}', String(checked.size))
+      : t('cooked_btn_plain')
 
   return (
     <div className="fixed inset-0 bg-black/40 z-[200] flex items-end justify-center" onClick={onClose}>
@@ -100,7 +107,7 @@ export default function MarkCookedModal({ meal, onClose, onCooked }: Props) {
 
         <div className="flex-shrink-0 px-6 pt-2 pb-3 flex items-center justify-between">
           <div>
-            <h2 className="text-xl font-bold text-slate-800">✅ Mark as Cooked</h2>
+            <h2 className="text-xl font-bold text-slate-800">{t('cooked_title')}</h2>
             <p className="text-xs text-slate-400 mt-0.5">{meal.name}</p>
           </div>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600 text-2xl leading-none">✕</button>
@@ -109,13 +116,13 @@ export default function MarkCookedModal({ meal, onClose, onCooked }: Props) {
         <div className="flex-1 min-h-0 overflow-y-auto px-6 pb-4">
           {loading ? (
             <div className="flex items-center justify-center py-12 text-slate-400 text-sm animate-pulse">
-              Loading ingredients…
+              {t('loading')}
             </div>
           ) : (
             <>
               {pantryLinked.length > 0 && (
                 <div className="mb-4">
-                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Deduct from pantry</p>
+                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">{t('cooked_deduct')}</p>
                   <div className="space-y-0.5">
                     {pantryLinked.map(ing => (
                       <label key={ing.id} className="flex items-center gap-3 py-2.5 px-3 rounded-xl hover:bg-slate-50 cursor-pointer">
@@ -143,7 +150,7 @@ export default function MarkCookedModal({ meal, onClose, onCooked }: Props) {
 
               {notLinked.length > 0 && (
                 <div>
-                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Not in pantry</p>
+                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">{t('cooked_not_in_pantry')}</p>
                   <div className="space-y-0.5">
                     {notLinked.map(ing => (
                       <div key={ing.id} className="flex items-center gap-3 py-2.5 px-3 opacity-40">
@@ -156,7 +163,7 @@ export default function MarkCookedModal({ meal, onClose, onCooked }: Props) {
               )}
 
               {ingredients.length === 0 && (
-                <p className="text-sm text-slate-400 py-8 text-center">No ingredients recorded for this meal</p>
+                <p className="text-sm text-slate-400 py-8 text-center">{t('cooked_no_ingredients')}</p>
               )}
             </>
           )}
@@ -168,11 +175,7 @@ export default function MarkCookedModal({ meal, onClose, onCooked }: Props) {
             disabled={saving || loading}
             className="w-full py-4 bg-emerald-500 hover:bg-emerald-600 disabled:bg-slate-300 text-white font-semibold rounded-2xl text-base transition-colors"
           >
-            {saving
-              ? 'Saving…'
-              : checked.size > 0
-                ? `✅ Cooked — deduct ${checked.size} item${checked.size !== 1 ? 's' : ''} from pantry`
-                : '✅ Mark as cooked'}
+            {btnLabel}
           </button>
         </div>
       </div>

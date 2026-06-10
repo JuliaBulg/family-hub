@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useAuth } from '@/contexts/AuthContext'
 import { supabase } from '@/lib/supabase'
+import { useT } from '@/lib/i18n'
 
 interface Props {
   open: boolean
@@ -12,6 +13,7 @@ interface Props {
 
 export default function ProfileSheet({ open, onClose }: Props) {
   const { user, profile, signOut, refreshProfile } = useAuth()
+  const t = useT()
   const [householdName, setHouseholdName] = useState<string | null>(null)
   const [inviteCode, setInviteCode]       = useState<string | null>(null)
   const [inviteCopied, setInviteCopied]   = useState(false)
@@ -96,9 +98,8 @@ export default function ProfileSheet({ open, onClose }: Props) {
 
       <div className="fixed inset-0 z-50 flex items-center justify-center p-6">
         <div className="bg-white rounded-2xl w-full max-w-sm shadow-2xl">
-          {/* header row */}
           <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-slate-100">
-            <h2 className="text-base font-semibold text-slate-700">Account</h2>
+            <h2 className="text-base font-semibold text-slate-700">{t('profile_account')}</h2>
             <button
               onClick={onClose}
               aria-label="Close"
@@ -132,16 +133,16 @@ export default function ProfileSheet({ open, onClose }: Props) {
                 <p className="text-sm font-semibold text-slate-700 capitalize">
                   {profile?.role ?? 'Member'}
                 </p>
-                <p className="text-xs text-slate-400">Account role</p>
+                <p className="text-xs text-slate-400">{t('profile_role_label')}</p>
               </div>
             </div>
 
             {/* Language picker */}
             <div className="mb-5">
               <div className="flex items-center justify-between mb-2">
-                <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Language · AI responses</p>
-                {savingLang && <p className="text-xs text-slate-400">Saving…</p>}
-                {langSaved && <p className="text-xs text-emerald-600 font-medium">✓ Saved</p>}
+                <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide">{t('profile_lang_label')}</p>
+                {savingLang && <p className="text-xs text-slate-400">{t('profile_lang_saving')}</p>}
+                {langSaved && <p className="text-xs text-emerald-600 font-medium">{t('profile_lang_saved')}</p>}
               </div>
               <div className="flex gap-2">
                 {LANGUAGES.map(lang => (
@@ -206,17 +207,16 @@ export default function ProfileSheet({ open, onClose }: Props) {
                 onClick={() => void copyInviteLink()}
                 className="w-full py-3 border border-emerald-200 bg-emerald-50 text-emerald-700 font-semibold rounded-xl text-sm hover:bg-emerald-100 active:bg-emerald-200 transition-colors mb-3"
               >
-                {inviteCopied ? '✓ Link copied!' : '🔗 Copy invite link'}
+                {inviteCopied ? t('profile_invite_copied') : t('profile_invite')}
               </button>
             )}
 
-            {/* sign out */}
             <button
               onClick={() => void handleSignOut()}
               disabled={signingOut}
               className="w-full py-3 border border-slate-200 text-slate-600 font-semibold rounded-xl text-sm hover:bg-slate-50 active:bg-slate-100 disabled:opacity-60 transition-colors"
             >
-              {signingOut ? 'Signing out…' : 'Sign out'}
+              {signingOut ? t('profile_signing_out') : t('profile_sign_out')}
             </button>
           </div>
         </div>

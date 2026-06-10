@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
+import { useT } from '@/lib/i18n'
 
 interface RecipeIngredient {
   id?: string
@@ -36,6 +37,7 @@ function emptyIngredient(): RecipeIngredient {
 
 export default function AddRecipeModal({ recipe, onClose, onSaved }: Props) {
   const { profile } = useAuth()
+  const t = useT()
 
   const [name, setName] = useState(recipe?.name ?? '')
   const [ingredients, setIngredients] = useState<RecipeIngredient[]>(
@@ -118,25 +120,27 @@ export default function AddRecipeModal({ recipe, onClose, onSaved }: Props) {
         </div>
 
         <div className="flex-shrink-0 px-6 pt-2 pb-3 flex items-center justify-between">
-          <h2 className="text-xl font-bold text-slate-800">{recipe ? 'Edit Recipe' : '📖 New Recipe'}</h2>
+          <h2 className="text-xl font-bold text-slate-800">
+            {recipe ? t('recipe_edit_title') : t('recipe_add_title')}
+          </h2>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600 text-2xl leading-none">✕</button>
         </div>
 
         <div className="flex-1 min-h-0 overflow-y-auto px-6 pb-4 space-y-5">
           <div>
-            <label className="text-sm font-medium text-slate-600 mb-1 block">Recipe name</label>
+            <label className="text-sm font-medium text-slate-600 mb-1 block">{t('recipe_name_label')}</label>
             <input
               type="text"
               value={name}
               onChange={e => setName(e.target.value)}
-              placeholder="e.g. Pasta Bolognese"
+              placeholder={t('recipe_name_placeholder')}
               autoFocus
               className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-400"
             />
           </div>
 
           <div>
-            <label className="text-sm font-medium text-slate-600 mb-2 block">Ingredients</label>
+            <label className="text-sm font-medium text-slate-600 mb-2 block">{t('recipe_ingredients_label')}</label>
             <div className="space-y-2">
               {ingredients.map((ing, i) => (
                 <div key={i} className="flex gap-2 items-center">
@@ -144,21 +148,21 @@ export default function AddRecipeModal({ recipe, onClose, onSaved }: Props) {
                     type="text"
                     value={ing.name}
                     onChange={e => updateIngredient(i, 'name', e.target.value)}
-                    placeholder="Ingredient"
+                    placeholder={t('recipe_ing_placeholder')}
                     className="flex-1 min-w-0 px-3 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-800 placeholder-slate-400 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
                   />
                   <input
                     type="text"
                     value={ing.quantity}
                     onChange={e => updateIngredient(i, 'quantity', e.target.value)}
-                    placeholder="Qty"
+                    placeholder={t('recipe_qty_placeholder')}
                     className="w-16 px-2 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-800 placeholder-slate-400 text-sm text-center focus:outline-none focus:ring-2 focus:ring-emerald-400"
                   />
                   <input
                     type="text"
                     value={ing.unit}
                     onChange={e => updateIngredient(i, 'unit', e.target.value)}
-                    placeholder="Unit"
+                    placeholder={t('recipe_unit_placeholder')}
                     className="w-16 px-2 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-800 placeholder-slate-400 text-sm text-center focus:outline-none focus:ring-2 focus:ring-emerald-400"
                   />
                   <button
@@ -175,7 +179,7 @@ export default function AddRecipeModal({ recipe, onClose, onSaved }: Props) {
               onClick={() => setIngredients(prev => [...prev, emptyIngredient()])}
               className="mt-3 text-sm font-medium text-emerald-600 hover:text-emerald-700 flex items-center gap-1"
             >
-              + Add ingredient
+              {t('recipe_add_ing')}
             </button>
           </div>
 
@@ -188,7 +192,7 @@ export default function AddRecipeModal({ recipe, onClose, onSaved }: Props) {
             disabled={loading || !name.trim()}
             className="w-full py-4 bg-emerald-500 hover:bg-emerald-600 disabled:bg-slate-300 text-white font-semibold rounded-2xl text-base transition-colors"
           >
-            {loading ? 'Saving…' : recipe ? '✅ Save Changes' : '✅ Save Recipe'}
+            {loading ? t('saving') : recipe ? t('recipe_save_changes_btn') : t('recipe_save_btn')}
           </button>
         </div>
       </div>

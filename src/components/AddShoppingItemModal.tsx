@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
+import { useT } from '@/lib/i18n'
 
 interface Props {
   onClose: () => void
@@ -11,6 +12,7 @@ interface Props {
 
 export default function AddShoppingItemModal({ onClose, onAdded }: Props) {
   const { profile } = useAuth()
+  const t = useT()
   const [name, setName]         = useState('')
   const [quantity, setQuantity] = useState('')
   const [saving, setSaving]     = useState(false)
@@ -39,22 +41,18 @@ export default function AddShoppingItemModal({ onClose, onAdded }: Props) {
         style={{ maxHeight: '85dvh' }}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Drag handle */}
         <div className="flex justify-center pt-3 pb-1">
           <div className="w-10 h-1 bg-slate-200 rounded-full" />
         </div>
 
-        {/* Header */}
         <div className="flex items-center justify-between px-4 pt-2 pb-3 border-b border-slate-100">
-          <h2 className="text-lg font-bold text-slate-800">Add to Shopping List</h2>
+          <h2 className="text-lg font-bold text-slate-800">{t('smodal_title')}</h2>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600 text-2xl leading-none">✕</button>
         </div>
 
-        {/* Form */}
         <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
-          {/* Item name */}
           <div>
-            <label className="block text-sm font-semibold text-slate-600 mb-1">Item name *</label>
+            <label className="block text-sm font-semibold text-slate-600 mb-1">{t('smodal_name')} *</label>
             <input
               type="text"
               value={name}
@@ -65,10 +63,9 @@ export default function AddShoppingItemModal({ onClose, onAdded }: Props) {
             />
           </div>
 
-          {/* Quantity */}
           <div>
             <label className="block text-sm font-semibold text-slate-600 mb-1">
-              Quantity <span className="font-normal text-slate-400">(optional)</span>
+              {t('smodal_qty')} <span className="font-normal text-slate-400">(optional)</span>
             </label>
             <input
               type="text"
@@ -82,14 +79,13 @@ export default function AddShoppingItemModal({ onClose, onAdded }: Props) {
           {error && <p className="text-red-500 text-sm">{error}</p>}
         </div>
 
-        {/* Footer */}
         <div className="px-4 py-4 border-t border-slate-100">
           <button
             onClick={handleAdd}
             disabled={saving}
             className="w-full py-3 bg-emerald-500 hover:bg-emerald-600 active:bg-emerald-700 disabled:opacity-50 text-white font-semibold rounded-2xl text-base transition-colors shadow-sm"
           >
-            {saving ? 'Adding…' : '+ Add Item'}
+            {saving ? t('saving') : t('smodal_add_btn')}
           </button>
         </div>
       </div>

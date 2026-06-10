@@ -7,6 +7,7 @@ import AddPantryItemModal from '@/components/AddPantryItemModal'
 import ImportReceiptModal from '@/components/ImportReceiptModal'
 import CookTonightModal from '@/components/CookTonightModal'
 import { type Category, CATEGORIES } from '@/lib/categories'
+import { useT, useCatLabel } from '@/lib/i18n'
 
 interface PantryItem {
   id: string
@@ -55,8 +56,10 @@ function groupQuantity(group: PantryItem[]): string {
 
 export default function PantryPage() {
   const { profile } = useAuth()
+  const t = useT()
+  const catLabel = useCatLabel()
   const [items, setItems]                         = useState<PantryItem[]>([])
-const [showModal, setShowModal]                 = useState(false)
+  const [showModal, setShowModal]                 = useState(false)
   const [showImportModal, setShowImportModal]     = useState(false)
   const [showCookModal, setShowCookModal]         = useState(false)
   const [editItem, setEditItem]                   = useState<PantryItem | null>(null)
@@ -69,24 +72,31 @@ const [showModal, setShowModal]                 = useState(false)
   const [reservations, setReservations]   = useState<Map<string, { mealName: string; mealDate: string }>>(new Map())
 
   const fetchItems = useCallback(async () => {
+    if (!profile?.household_id) return
     const { data } = await supabase
       .from('pantry_items')
       .select('*')
+      .eq('household_id', profile.household_id)
       .order('created_at', { ascending: false })
     setItems(data ?? [])
-  }, [])
+  }, [profile?.household_id])
 
   const fetchShoppingNames = useCallback(async () => {
-    const { data } = await supabase.from('shopping_items').select('name').eq('is_ticked', false)
+    if (!profile?.household_id) return
+    const { data } = await supabase.from('shopping_items').select('name')
+      .eq('household_id', profile.household_id)
+      .eq('is_ticked', false)
     setShoppingNames(new Set((data ?? []).map(i => i.name.toLowerCase())))
-  }, [])
+  }, [profile?.household_id])
 
   const fetchReservations = useCallback(async () => {
+    if (!profile?.household_id) return
     const today = new Date().toISOString().split('T')[0]
     const { data } = await supabase
       .from('meal_ingredients')
-      .select('pantry_item_id, meals(name, date, cooked_at)')
+      .select('pantry_item_id, meals!inner(name, date, cooked_at, household_id)')
       .not('pantry_item_id', 'is', null)
+      .eq('meals.household_id', profile.household_id)
     const map = new Map<string, { mealName: string; mealDate: string }>()
     for (const row of data ?? []) {
       const meal = row.meals as unknown as { name: string; date: string; cooked_at: string | null } | null
@@ -165,7 +175,7 @@ const [showModal, setShowModal]                 = useState(false)
         <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">🔍</span>
         <input
           type="text"
-          placeholder="Search pantry…"
+          placeholder={t('pantry_search')}
           value={search}
           onChange={e => setSearch(e.target.value)}
           className="w-full pl-8 pr-8 py-2 bg-white border border-slate-200 rounded-xl text-sm text-slate-700 placeholder-slate-400 focus:outline-none focus:border-emerald-400"
@@ -186,7 +196,7 @@ const [showModal, setShowModal]                 = useState(false)
           {searchResults.length === 0 ? (
             <div className="text-center py-10 text-slate-400">
               <p className="text-3xl mb-2">🔍</p>
-              <p className="text-sm">No items found for &ldquo;{search.trim()}&rdquo;</p>
+              <p className="text-sm">{t('pantry_search_empty')} &ldquo;{search.trim()}&rdquo;</p>
             </div>
           ) : (
             <>
@@ -214,12 +224,12 @@ const [showModal, setShowModal]                 = useState(false)
                       <p className="font-medium text-slate-700">{group[0].name}</p>
                       <p className="text-xs text-slate-400">
                         {qty}
-                        {anyExpired && <span className="text-red-500"> · 🚨 Expired</span>}
+                        {anyExpired && <span className="text-red-500"> · 🚨 {t('pantry_expired_badge')}</span>}
                         {!anyExpired && anySoon && (
                           <span className="text-amber-500">
-                            {' · ⏰ Expiring soon'}
-                            {onList    && ' · 🛒 On list'}
-                            {wasOnList && ' · ✓ Was on list'}
+                            {' · ⏰ '}{t('pantry_expiring_section')}
+                            {onList    && ` · 🛒 ${t('pantry_on_shopping')}`}
+                            {wasOnList && ` · ${t('pantry_was_on_list')}`}
                           </span>
                         )}
                         {reservation && (
@@ -237,188 +247,185 @@ const [showModal, setShowModal]                 = useState(false)
         </div>
       ) : (
         <>
-      {/* Expiry alerts */}
-      {expired.length > 0 && (
-        <div className="mb-2 bg-red-50 border border-red-200 rounded-xl overflow-hidden">
-          <button
-            onClick={() => setExpiredExpanded(v => !v)}
-            className="w-full flex items-center gap-2 px-3 py-2.5"
-          >
-            <span className="text-lg">🚨</span>
-            <p className="flex-1 text-left font-semibold text-red-800 text-xs">
-              {groupByName(expired).length} item{groupByName(expired).length > 1 ? 's' : ''} expired — tap to manage
-            </p>
-            <span className={`text-red-400 text-base transition-transform duration-200 ${expiredExpanded ? 'rotate-90' : ''}`}>›</span>
-          </button>
-          {expiredExpanded && (
-            <div className="border-t border-red-200 divide-y divide-red-100">
-              {groupByName(expired).map(group => (
-                <div key={group[0].id} className="flex items-center gap-2 px-3 py-2">
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs font-medium text-red-900 truncate">{group[0].name}</p>
-                    {groupQuantity(group) && <p className="text-xs text-red-400">{groupQuantity(group)}</p>}
-                  </div>
-                  <button
-                    onClick={() => sendExpiredGroup(group)}
-                    className="text-xs bg-red-500 hover:bg-red-600 text-white px-2 py-1 rounded-lg font-medium flex-shrink-0"
-                  >
-                    + Shopping list
-                  </button>
-                  <button
-                    onClick={() => discardExpiredGroup(group)}
-                    className="text-xs bg-red-100 hover:bg-red-200 text-red-600 px-2 py-1 rounded-lg font-medium flex-shrink-0"
-                  >
-                    🗑️ Discard
-                  </button>
+          {/* Expiry alerts */}
+          {expired.length > 0 && (
+            <div className="mb-2 bg-red-50 border border-red-200 rounded-xl overflow-hidden">
+              <button
+                onClick={() => setExpiredExpanded(v => !v)}
+                className="w-full flex items-center gap-2 px-3 py-2.5"
+              >
+                <span className="text-lg">🚨</span>
+                <p className="flex-1 text-left font-semibold text-red-800 text-xs">
+                  {groupByName(expired).length} item{groupByName(expired).length > 1 ? 's' : ''} {t('pantry_expired_section').toLowerCase()} — tap to manage
+                </p>
+                <span className={`text-red-400 text-base transition-transform duration-200 ${expiredExpanded ? 'rotate-90' : ''}`}>›</span>
+              </button>
+              {expiredExpanded && (
+                <div className="border-t border-red-200 divide-y divide-red-100">
+                  {groupByName(expired).map(group => (
+                    <div key={group[0].id} className="flex items-center gap-2 px-3 py-2">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-medium text-red-900 truncate">{group[0].name}</p>
+                        {groupQuantity(group) && <p className="text-xs text-red-400">{groupQuantity(group)}</p>}
+                      </div>
+                      <button
+                        onClick={() => sendExpiredGroup(group)}
+                        className="text-xs bg-red-500 hover:bg-red-600 text-white px-2 py-1 rounded-lg font-medium flex-shrink-0"
+                      >
+                        {t('pantry_add_shopping_list')}
+                      </button>
+                      <button
+                        onClick={() => discardExpiredGroup(group)}
+                        className="text-xs bg-red-100 hover:bg-red-200 text-red-600 px-2 py-1 rounded-lg font-medium flex-shrink-0"
+                      >
+                        {t('pantry_discard')}
+                      </button>
+                    </div>
+                  ))}
                 </div>
-              ))}
+              )}
             </div>
           )}
-        </div>
-      )}
 
-      {expiringSoon.length > 0 && (
-        <div className="mb-2 bg-amber-50 border border-amber-200 rounded-xl overflow-hidden">
-          <button
-            onClick={() => setExpiringSoonExpanded(v => !v)}
-            className="w-full flex items-center gap-2 px-3 py-2.5"
-          >
-            <span className="text-lg">⏰</span>
-            <p className="flex-1 text-left font-semibold text-amber-800 text-xs">
-              {groupByName(expiringSoon).length} item{groupByName(expiringSoon).length > 1 ? 's' : ''} expiring soon — tap to manage
-            </p>
-            <span className={`text-amber-400 text-base transition-transform duration-200 ${expiringSoonExpanded ? 'rotate-90' : ''}`}>›</span>
-          </button>
-          {expiringSoonExpanded && (
-            <div className="border-t border-amber-200 divide-y divide-amber-100">
-              {groupByName(expiringSoon).map(group => (
-                <div key={group[0].id} className="flex items-center gap-2 px-3 py-2">
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs font-medium text-amber-900 truncate">{group[0].name}</p>
-                    {groupQuantity(group) && <p className="text-xs text-amber-500">{groupQuantity(group)}</p>}
-                  </div>
-                  <button
-                    onClick={() => sendExpiringSoonGroup(group)}
-                    className={`text-xs px-2 py-1 rounded-lg font-medium flex-shrink-0 transition-colors ${
-                      recentlySent.has(group[0].name)
-                        ? 'bg-emerald-100 text-emerald-700'
-                        : 'bg-amber-400 hover:bg-amber-500 text-white'
-                    }`}
-                  >
-                    {recentlySent.has(group[0].name) ? '✓ Added' : '+ Shopping list'}
-                  </button>
+          {expiringSoon.length > 0 && (
+            <div className="mb-2 bg-amber-50 border border-amber-200 rounded-xl overflow-hidden">
+              <button
+                onClick={() => setExpiringSoonExpanded(v => !v)}
+                className="w-full flex items-center gap-2 px-3 py-2.5"
+              >
+                <span className="text-lg">⏰</span>
+                <p className="flex-1 text-left font-semibold text-amber-800 text-xs">
+                  {groupByName(expiringSoon).length} item{groupByName(expiringSoon).length > 1 ? 's' : ''} {t('pantry_expiring_section').toLowerCase()} — tap to manage
+                </p>
+                <span className={`text-amber-400 text-base transition-transform duration-200 ${expiringSoonExpanded ? 'rotate-90' : ''}`}>›</span>
+              </button>
+              {expiringSoonExpanded && (
+                <div className="border-t border-amber-200 divide-y divide-amber-100">
+                  {groupByName(expiringSoon).map(group => (
+                    <div key={group[0].id} className="flex items-center gap-2 px-3 py-2">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-medium text-amber-900 truncate">{group[0].name}</p>
+                        {groupQuantity(group) && <p className="text-xs text-amber-500">{groupQuantity(group)}</p>}
+                      </div>
+                      <button
+                        onClick={() => sendExpiringSoonGroup(group)}
+                        className={`text-xs px-2 py-1 rounded-lg font-medium flex-shrink-0 transition-colors ${
+                          recentlySent.has(group[0].name)
+                            ? 'bg-emerald-100 text-emerald-700'
+                            : 'bg-amber-400 hover:bg-amber-500 text-white'
+                        }`}
+                      >
+                        {recentlySent.has(group[0].name) ? t('pantry_added') : t('pantry_add_shopping_list')}
+                      </button>
+                    </div>
+                  ))}
                 </div>
-              ))}
+              )}
             </div>
           )}
-        </div>
-      )}
 
-      {expired.length === 0 && expiringSoon.length === 0 && (
-        <div className="mb-2 px-3 py-2 bg-amber-50 border border-amber-200 rounded-xl flex gap-2 items-center">
-          <span className="text-lg">⏰</span>
-          <p className="text-amber-800 text-xs font-semibold">No expiry alerts</p>
-        </div>
-      )}
+          {expired.length === 0 && expiringSoon.length === 0 && (
+            <div className="mb-2 px-3 py-2 bg-amber-50 border border-amber-200 rounded-xl flex gap-2 items-center">
+              <span className="text-lg">⏰</span>
+              <p className="text-amber-800 text-xs font-semibold">No expiry alerts</p>
+            </div>
+          )}
 
-      {/* Cook tonight button */}
-      <button
-        onClick={() => setShowCookModal(true)}
-        className="w-full mb-3 py-2 bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-700 font-semibold rounded-xl text-sm transition-colors"
-      >
-        🍽️ What can I cook tonight?
-      </button>
+          {/* Cook tonight button */}
+          <button
+            onClick={() => setShowCookModal(true)}
+            className="w-full mb-3 py-2 bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-700 font-semibold rounded-xl text-sm transition-colors"
+          >
+            {t('pantry_cook_btn')}
+          </button>
 
-      {/* Category cards */}
-      <div className="space-y-2 mb-3">
-        <h2 className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Pantry</h2>
+          {/* Category cards */}
+          <div className="space-y-2 mb-3">
+            <h2 className="text-xs font-semibold text-slate-500 uppercase tracking-wide">{t('tab_pantry')}</h2>
 
-        {CATEGORIES.map((cat) => {
-            const catItems = items.filter((i) => i.category === cat.value)
-            const isOpen   = expandedCategory === cat.value
-            const groups   = groupByName(catItems)
+            {CATEGORIES.map((cat) => {
+              const catItems = items.filter((i) => i.category === cat.value)
+              const isOpen   = expandedCategory === cat.value
+              const groups   = groupByName(catItems)
 
-            return (
-              <div key={cat.value}>
-                {/* Category header */}
-                <button
-                  onClick={() => setExpandedCategory(isOpen ? null : cat.value)}
-                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border ${cat.color} cursor-pointer active:scale-[0.98] transition-transform`}
-                >
-                  <span className="text-xl">{cat.emoji}</span>
-                  <div className="flex-1 text-left">
-                    <p className="font-semibold text-slate-800 text-sm">{cat.label}</p>
-                    <p className="text-xs text-slate-500">
-                      {groups.length === 0 ? 'Nothing added yet' : `${groups.length} item${groups.length > 1 ? 's' : ''}`}
-                    </p>
-                  </div>
-                  <span className={`text-slate-400 text-lg transition-transform ${isOpen ? 'rotate-90' : ''}`}>›</span>
-                </button>
+              return (
+                <div key={cat.value}>
+                  <button
+                    onClick={() => setExpandedCategory(isOpen ? null : cat.value)}
+                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border ${cat.color} cursor-pointer active:scale-[0.98] transition-transform`}
+                  >
+                    <span className="text-xl">{cat.emoji}</span>
+                    <div className="flex-1 text-left">
+                      <p className="font-semibold text-slate-800 text-sm">{catLabel(cat.value)}</p>
+                      <p className="text-xs text-slate-500">
+                        {groups.length === 0 ? t('pantry_nothing_yet') : `${groups.length} item${groups.length > 1 ? 's' : ''}`}
+                      </p>
+                    </div>
+                    <span className={`text-slate-400 text-lg transition-transform ${isOpen ? 'rotate-90' : ''}`}>›</span>
+                  </button>
 
-                {/* Items list — grouped */}
-                {isOpen && groups.length > 0 && (
-                  <div className="mt-1 ml-2 space-y-1">
-                    {groups.map((group) => {
-                      const anyExpired  = group.some(i => isExpired(i.expiry_date))
-                      const anySoon     = group.some(i => isExpiringSoon(i.expiry_date))
-                      const onList      = group.some(i => shoppingNames.has(i.name.toLowerCase()))
-                      const wasOnList   = !onList && group.some(i => i.shopping_alert_dismissed)
-                      const reservation = group.map(i => reservations.get(i.id)).find(Boolean)
-                      const qty         = groupQuantity(group)
-                      const ids         = group.map(i => i.id)
-                      return (
-                        <div
-                          key={group[0].id}
-                          className={`flex items-center gap-3 px-4 py-3 bg-white border rounded-xl ${
-                            anyExpired ? 'border-red-200' : anySoon ? 'border-amber-200' : reservation ? 'border-violet-200' : 'border-slate-100'
-                          }`}
-                        >
-                          <div className="flex-1">
-                            <p className="font-medium text-slate-700">{group[0].name}</p>
-                            <p className="text-xs text-slate-400">
-                              {qty}
-                              {anyExpired && <span className="text-red-500"> · 🚨 Expired</span>}
-                              {!anyExpired && anySoon && (
-                                <span className="text-amber-500">
-                                  {' · ⏰ Expiring soon'}
-                                  {onList    && ' · 🛒 On list'}
-                                  {wasOnList && ' · ✓ Was on list'}
-                                </span>
-                              )}
-                              {reservation && (
-                                <span className="text-violet-500"> · 📅 {reservation.mealName}</span>
-                              )}
-                            </p>
+                  {isOpen && groups.length > 0 && (
+                    <div className="mt-1 ml-2 space-y-1">
+                      {groups.map((group) => {
+                        const anyExpired  = group.some(i => isExpired(i.expiry_date))
+                        const anySoon     = group.some(i => isExpiringSoon(i.expiry_date))
+                        const onList      = group.some(i => shoppingNames.has(i.name.toLowerCase()))
+                        const wasOnList   = !onList && group.some(i => i.shopping_alert_dismissed)
+                        const reservation = group.map(i => reservations.get(i.id)).find(Boolean)
+                        const qty         = groupQuantity(group)
+                        const ids         = group.map(i => i.id)
+                        return (
+                          <div
+                            key={group[0].id}
+                            className={`flex items-center gap-3 px-4 py-3 bg-white border rounded-xl ${
+                              anyExpired ? 'border-red-200' : anySoon ? 'border-amber-200' : reservation ? 'border-violet-200' : 'border-slate-100'
+                            }`}
+                          >
+                            <div className="flex-1">
+                              <p className="font-medium text-slate-700">{group[0].name}</p>
+                              <p className="text-xs text-slate-400">
+                                {qty}
+                                {anyExpired && <span className="text-red-500"> · 🚨 {t('pantry_expired_badge')}</span>}
+                                {!anyExpired && anySoon && (
+                                  <span className="text-amber-500">
+                                    {' · ⏰ '}{t('pantry_expiring_section')}
+                                    {onList    && ` · 🛒 ${t('pantry_on_shopping')}`}
+                                    {wasOnList && ` · ${t('pantry_was_on_list')}`}
+                                  </span>
+                                )}
+                                {reservation && (
+                                  <span className="text-violet-500"> · 📅 {reservation.mealName}</span>
+                                )}
+                              </p>
+                            </div>
+                            <button
+                              onClick={() => setEditItem(group[0])}
+                              className="text-slate-300 hover:text-slate-500 text-base transition-colors px-1"
+                              title="Edit"
+                            >
+                              ✏️
+                            </button>
+                            <button
+                              onClick={() => deleteGroup(ids)}
+                              className="text-slate-300 hover:text-red-400 text-lg transition-colors"
+                            >
+                              ✕
+                            </button>
                           </div>
-                          <button
-                            onClick={() => setEditItem(group[0])}
-                            className="text-slate-300 hover:text-slate-500 text-base transition-colors px-1"
-                            title="Edit"
-                          >
-                            ✏️
-                          </button>
-                          <button
-                            onClick={() => deleteGroup(ids)}
-                            className="text-slate-300 hover:text-red-400 text-lg transition-colors"
-                          >
-                            ✕
-                          </button>
-                        </div>
-                      )
-                    })}
-                  </div>
-                )}
+                        )
+                      })}
+                    </div>
+                  )}
 
-                {isOpen && groups.length === 0 && (
-                  <div className="mt-1 ml-2 px-4 py-3 text-slate-400 text-sm italic">
-                    Nothing in this category yet
-                  </div>
-                )}
-              </div>
-            )
-          })
-        }
-      </div>
+                  {isOpen && groups.length === 0 && (
+                    <div className="mt-1 ml-2 px-4 py-3 text-slate-400 text-sm italic">
+                      {t('pantry_cat_empty')}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
         </>
       )}
 
@@ -428,17 +435,16 @@ const [showModal, setShowModal]                 = useState(false)
           onClick={() => setShowModal(true)}
           className="flex-1 py-3 bg-emerald-500 hover:bg-emerald-600 active:bg-emerald-700 text-white font-semibold rounded-xl text-sm transition-colors shadow-sm"
         >
-          + Add Item
+          {t('pantry_add_item')}
         </button>
         <button
           onClick={() => setShowImportModal(true)}
           className="flex-1 py-3 bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-700 font-semibold rounded-xl text-sm transition-colors shadow-sm"
         >
-          🧾 From Receipt
+          {t('pantry_import_btn')}
         </button>
       </div>
 
-      {/* Add pantry item modal */}
       {showModal && (
         <AddPantryItemModal
           onClose={() => setShowModal(false)}
@@ -446,7 +452,6 @@ const [showModal, setShowModal]                 = useState(false)
         />
       )}
 
-      {/* Edit pantry item modal */}
       {editItem && (
         <AddPantryItemModal
           editItem={editItem}
