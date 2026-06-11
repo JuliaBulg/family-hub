@@ -5,7 +5,6 @@ import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
 import AddRecipeModal from '@/components/AddRecipeModal'
 import PlanRecipeModal from '@/components/PlanRecipeModal'
-import { FAMILY_RECIPES_PRELOAD } from '@/lib/family-recipes'
 import { useT } from '@/lib/i18n'
 
 interface RecipeIngredient {
@@ -56,44 +55,7 @@ export default function RecipesPage() {
     setLoading(false)
   }, [profile?.household_id])
 
-  useEffect(() => {
-    if (!profile?.household_id) return
-    async function init() {
-      const { count } = await supabase
-        .from('recipes')
-        .select('id', { count: 'exact', head: true })
-        .eq('household_id', profile!.household_id)
-
-      if (count === 0) {
-        await preloadRecipes()
-      }
-      await fetchRecipes()
-    }
-    init()
-  }, [fetchRecipes, profile?.household_id])
-
-  async function preloadRecipes() {
-    for (const r of FAMILY_RECIPES_PRELOAD) {
-      const { data: newRecipe } = await supabase
-        .from('recipes')
-        .insert({ name: r.name, household_id: profile?.household_id, source: 'preloaded' })
-        .select('id')
-        .single()
-
-      if (newRecipe && r.ingredients.length > 0) {
-        await supabase.from('recipe_ingredients').insert(
-          r.ingredients.map(ing => ({
-            recipe_id: newRecipe.id,
-            household_id: profile?.household_id,
-            name: ing.name,
-            quantity: ing.quantity,
-            unit: ing.unit,
-            sort_order: ing.sort_order,
-          }))
-        )
-      }
-    }
-  }
+  useEffect(() => { fetchRecipes() }, [fetchRecipes])
 
   async function deleteRecipe(id: string) {
     setDeleting(id)
