@@ -79,13 +79,37 @@ Client-side every SELECT also carries `.eq('household_id', profile.household_id)
 ### UX polish
 | Idea | Effort | Notes |
 |------|--------|-------|
-| **Shopping list grouped by category** | Medium | Items grouped under Meat, Dairy, Vegetables — much easier to use in-store |
+| **Shopping list grouped by store aisle** | Medium | `category` column already on `shopping_items` (deployed). Next: add `section` sub-grouping within Food using store-aisle sections (see below). Existing items default to 'other' — need keyword auto-detect or user picks section. |
 | **Expense charts / monthly summary** | Medium | Visualise where money goes; bar/pie chart by category across months |
 | "Plan for today / tomorrow" shortcuts | Tiny | Quick buttons in PlanRecipeModal to skip date picker for common cases |
 | Household invite via QR code | Small | Alternative to copying the invite link string |
 | Weekly meal plan PDF / share | Large | Export the week as printable or shareable |
 | Notifications — expiry alerts | Medium | Push or email when items expire soon |
 | Barcode scan to add pantry items | Large | Camera scan — out of scope for v1 |
+
+### Shopping list — food section design (next session work)
+
+`category` column is live on `shopping_items`. DB and modal picker are done. Grouping display was rolled back because existing items got `DEFAULT 'other'`.
+
+**Agreed food sections (Baltic store aisle order):**
+| Section value | Label | Emoji | Typical items |
+|---|---|---|---|
+| `veg_fruit` | Vegetables & Fruits | 🥦 | carrots, apples, tomatoes, potatoes |
+| `bread` | Bread & Bakery | 🍞 | bread, rolls, pastry |
+| `dairy` | Dairy & Eggs | 🥛 | milk, cheese, butter, yogurt, eggs |
+| `meat` | Meat & Poultry | 🍖 | chicken, beef, pork, sausages, bacon |
+| `fish` | Fish & Seafood | 🐟 | salmon, tuna, herring, shrimp |
+| `dry` | Pantry & Dry Goods | 🥫 | pasta, rice, flour, oil, canned goods, sauces |
+| `frozen` | Frozen | 🧊 | frozen veg, ice cream |
+| `snacks` | Snacks & Sweets | 🍬 | chocolate, chips, nuts, cookies |
+| `food_other` | Other Food | 🍽️ | anything that doesn't fit above |
+
+**Design decisions to make next session:**
+- Auto-detect section by keyword (zero friction) vs always show section picker vs both
+- What to do with existing items that have no section (show ungrouped at bottom? default to food_other?)
+- Non-food categories (Household, Personal, etc.) group at top level only — no sub-sections
+
+---
 
 ### Store price comparison (future — blocked on data)
 | Idea | Effort | Blocker |
