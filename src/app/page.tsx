@@ -119,6 +119,7 @@ export default function PantryPage() {
     const { error } = await supabase.from('shopping_items').insert({
       name: group[0].name,
       quantity: groupQuantity(group) || null,
+      category: group[0].category,
       is_ticked: false,
       household_id: profile?.household_id,
       added_by: profile?.display_name,
@@ -140,6 +141,7 @@ export default function PantryPage() {
     const { error } = await supabase.from('shopping_items').insert({
       name: key,
       quantity: groupQuantity(group) || null,
+      category: group[0].category,
       is_ticked: false,
       household_id: profile?.household_id,
       added_by: profile?.display_name,

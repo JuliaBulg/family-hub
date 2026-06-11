@@ -96,6 +96,7 @@ export default function MenuPage() {
         missing.map(ing => ({
           name: ing.name,
           quantity: ing.quantity ? `${ing.quantity}${ing.unit ? ' ' + ing.unit : ''}` : null,
+          category: 'food',
           is_ticked: false,
           household_id: profile?.household_id,
           added_by: profile?.display_name,

@@ -79,13 +79,18 @@ Client-side every SELECT also carries `.eq('household_id', profile.household_id)
 ### UX polish
 | Idea | Effort | Notes |
 |------|--------|-------|
-| Shopping list grouped by category | Medium | Items grouped under Meat, Dairy, Vegetables — better for in-store use |
+| **Shopping list grouped by category** | Medium | Items grouped under Meat, Dairy, Vegetables — much easier to use in-store |
+| **Expense charts / monthly summary** | Medium | Visualise where money goes; bar/pie chart by category across months |
 | "Plan for today / tomorrow" shortcuts | Tiny | Quick buttons in PlanRecipeModal to skip date picker for common cases |
-| Expense charts / monthly summary | Medium | Visualise spending by category over time |
 | Household invite via QR code | Small | Alternative to copying the invite link string |
 | Weekly meal plan PDF / share | Large | Export the week as printable or shareable |
 | Notifications — expiry alerts | Medium | Push or email when items expire soon |
 | Barcode scan to add pantry items | Large | Camera scan — out of scope for v1 |
+
+### Store price comparison (future — blocked on data)
+| Idea | Effort | Blocker |
+|------|--------|---------|
+| Compare shopping list total across Rimi / Selver / Coop / Maxima | Large | No official public price APIs exist for Baltic grocery chains. Only possible via web scraping (fragile, ToS-grey) or a third-party aggregator like kaubahind.ee if they expose an API. Worth revisiting if any store publishes an official API. |
 
 ---
 

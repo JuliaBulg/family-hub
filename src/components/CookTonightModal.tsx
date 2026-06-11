@@ -98,6 +98,7 @@ export default function CookTonightModal({ items, onClose }: Props) {
     await supabase.from('shopping_items').insert(
       s.missing.map(name => ({
         name,
+        category: 'food',
         is_ticked: false,
         household_id: profile?.household_id,
         added_by: profile?.display_name,

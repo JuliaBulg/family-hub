@@ -3,7 +3,8 @@
 import { useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
-import { useT } from '@/lib/i18n'
+import { CATEGORIES } from '@/lib/categories'
+import { useT, useCatLabel } from '@/lib/i18n'
 
 interface Props {
   onClose: () => void
@@ -13,8 +14,10 @@ interface Props {
 export default function AddShoppingItemModal({ onClose, onAdded }: Props) {
   const { profile } = useAuth()
   const t = useT()
+  const catLabel = useCatLabel()
   const [name, setName]         = useState('')
   const [quantity, setQuantity] = useState('')
+  const [category, setCategory] = useState('other')
   const [saving, setSaving]     = useState(false)
   const [error, setError]       = useState('')
 
@@ -24,6 +27,7 @@ export default function AddShoppingItemModal({ onClose, onAdded }: Props) {
     const { error: dbErr } = await supabase.from('shopping_items').insert({
       name: name.trim(),
       quantity: quantity.trim() || null,
+      category,
       is_ticked: false,
       household_id: profile?.household_id,
       added_by: profile?.display_name,
@@ -74,6 +78,27 @@ export default function AddShoppingItemModal({ onClose, onAdded }: Props) {
               placeholder="e.g. 2, 1 bottle, 500g…"
               className="w-full px-4 py-3 border border-slate-200 rounded-2xl text-base focus:outline-none focus:border-emerald-400"
             />
+          </div>
+
+          <div>
+            <label className="block text-sm font-semibold text-slate-600 mb-1">{t('pmodal_category')}</label>
+            <div className="grid grid-cols-2 gap-2">
+              {CATEGORIES.map((cat) => (
+                <button
+                  key={cat.value}
+                  type="button"
+                  onClick={() => setCategory(cat.value)}
+                  className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border text-sm font-medium transition-colors ${
+                    category === cat.value
+                      ? 'bg-emerald-500 text-white border-emerald-500'
+                      : 'bg-slate-50 text-slate-600 border-slate-200'
+                  }`}
+                >
+                  <span>{cat.emoji}</span>
+                  <span className="truncate">{catLabel(cat.value)}</span>
+                </button>
+              ))}
+            </div>
           </div>
 
           {error && <p className="text-red-500 text-sm">{error}</p>}
