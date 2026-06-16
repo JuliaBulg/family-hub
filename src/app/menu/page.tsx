@@ -100,7 +100,8 @@ export default function MenuPage() {
       await addToShoppingMerged(
         missing.map(ing => ({
           name: ing.name,
-          quantity: ing.quantity ? `${ing.quantity}${ing.unit ? ' ' + ing.unit : ''}` : null,
+          amount_per_pack: ing.quantity ? parseFloat(ing.quantity) || null : null,
+          unit: ing.unit ?? null,
         })),
         profile.household_id,
         profile?.display_name ?? null,

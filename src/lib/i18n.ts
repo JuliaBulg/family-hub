@@ -164,8 +164,9 @@ const T = {
 
     // Shopping modal
     smodal_title: 'Add to Shopping List', smodal_edit_title: 'Edit Item',
-    smodal_name: 'Item name', smodal_qty: 'Quantity',
+    smodal_name: 'Item name', smodal_pcs: 'Pcs / boxes', smodal_amount: 'Amount', smodal_unit: 'Unit',
     smodal_add_btn: '✅ Add to List',
+    smodal_add_to_pantry: 'Add to pantry', smodal_skip: 'Skip',
 
     // Expenses
     exp_title: 'Expenses', exp_add: '+ Add',
@@ -317,8 +318,9 @@ const T = {
     pmodal_update_btn: '✅ Uuenda toodet',
 
     smodal_title: 'Lisa ostulistile', smodal_edit_title: 'Muuda toodet',
-    smodal_name: 'Toote nimi', smodal_qty: 'Kogus',
+    smodal_name: 'Toote nimi', smodal_pcs: 'Tk / pakki', smodal_amount: 'Kogus', smodal_unit: 'Ühik',
     smodal_add_btn: '✅ Lisa nimekirja',
+    smodal_add_to_pantry: 'Lisa sahvrisse', smodal_skip: 'Jäta',
 
     exp_title: 'Kulud', exp_add: '+ Lisa',
     exp_empty: 'Sel kuul kulutusi pole',
@@ -469,8 +471,9 @@ const T = {
     pmodal_update_btn: '✅ Обновить продукт',
 
     smodal_title: 'Добавить в список покупок', smodal_edit_title: 'Изменить товар',
-    smodal_name: 'Название товара', smodal_qty: 'Количество',
+    smodal_name: 'Название товара', smodal_pcs: 'Шт / упак.', smodal_amount: 'Количество', smodal_unit: 'Единица',
     smodal_add_btn: '✅ Добавить в список',
+    smodal_add_to_pantry: 'Добавить в кладовую', smodal_skip: 'Пропустить',
 
     exp_title: 'Расходы', exp_add: '+ Добавить',
     exp_empty: 'В этом месяце расходов нет',

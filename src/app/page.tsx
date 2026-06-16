@@ -116,9 +116,11 @@ export default function PantryPage() {
   }
 
   async function sendExpiredGroup(group: PantryItem[]) {
+    const qty = groupQuantity(group)
     const { error } = await supabase.from('shopping_items').insert({
       name: group[0].name,
-      quantity: groupQuantity(group) || null,
+      amount_per_pack: qty ? parseFloat(qty) || null : null,
+      unit: group[0].unit ?? null,
       category: group[0].category,
       is_ticked: false,
       household_id: profile?.household_id,
@@ -138,9 +140,11 @@ export default function PantryPage() {
 
   async function sendExpiringSoonGroup(group: PantryItem[]) {
     const key = group[0].name
+    const qty = groupQuantity(group)
     const { error } = await supabase.from('shopping_items').insert({
       name: key,
-      quantity: groupQuantity(group) || null,
+      amount_per_pack: qty ? parseFloat(qty) || null : null,
+      unit: group[0].unit ?? null,
       category: group[0].category,
       is_ticked: false,
       household_id: profile?.household_id,

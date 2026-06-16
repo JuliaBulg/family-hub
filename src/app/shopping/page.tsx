@@ -13,20 +13,45 @@ interface ShoppingItem {
   id: string
   name: string
   store: string
-  quantity: string | null
+  quantity: string | null      // legacy free-text fallback
+  pcs: number | null
+  amount_per_pack: number | null
+  unit: string | null
   is_ticked: boolean
   added_by: string | null
   category: string | null
 }
 
+function formatQuantity(item: ShoppingItem): string | null {
+  const p = item.pcs
+  const a = item.amount_per_pack
+  const u = item.unit
+  if (p && a && u) return `${p} × ${a} ${u}`
+  if (p && a)      return `${p} × ${a}`
+  if (a && u)      return `${a} ${u}`
+  if (p && u)      return `${p} ${u}`
+  if (p)           return `${p} pcs`
+  if (a)           return String(a)
+  return item.quantity ?? null
+}
+
+function pantryTotal(item: ShoppingItem): { quantity: string; unit: string | null } {
+  const p = item.pcs ?? 1
+  const a = item.amount_per_pack
+  if (a) return { quantity: String(p * a), unit: item.unit ?? null }
+  if (item.pcs) return { quantity: String(item.pcs), unit: item.unit ?? null }
+  return { quantity: item.quantity ?? '', unit: null }
+}
+
 export default function ShoppingPage() {
   const { profile } = useAuth()
   const t = useT()
-  const [items, setItems]               = useState<ShoppingItem[]>([])
-  const [showModal, setShowModal]       = useState(false)
-  const [editItem, setEditItem]         = useState<ShoppingItem | null>(null)
+  const [items, setItems]                 = useState<ShoppingItem[]>([])
+  const [showModal, setShowModal]         = useState(false)
+  const [editItem, setEditItem]           = useState<ShoppingItem | null>(null)
   const [pendingDelete, setPendingDelete] = useState<ShoppingItem | null>(null)
-  const undoTimerRef                    = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [pantryPrompt, setPantryPrompt]   = useState<ShoppingItem | null>(null)
+  const undoTimerRef                      = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const fetchItems = useCallback(async () => {
     if (!profile?.household_id) return
@@ -41,8 +66,26 @@ export default function ShoppingPage() {
   useEffect(() => { fetchItems() }, [fetchItems])
 
   async function toggleChecked(item: ShoppingItem) {
-    await supabase.from('shopping_items').update({ is_ticked: !item.is_ticked }).eq('id', item.id)
-    setItems((prev) => prev.map((i) => i.id === item.id ? { ...i, is_ticked: !i.is_ticked } : i))
+    const newTicked = !item.is_ticked
+    await supabase.from('shopping_items').update({ is_ticked: newTicked }).eq('id', item.id)
+    setItems((prev) => prev.map((i) => i.id === item.id ? { ...i, is_ticked: newTicked } : i))
+    // Offer to add to pantry when ticking an item that has quantity info
+    if (newTicked && (item.pcs || item.amount_per_pack || item.unit)) {
+      setPantryPrompt(item)
+    }
+  }
+
+  async function addToPantry(item: ShoppingItem) {
+    const { quantity, unit } = pantryTotal(item)
+    await supabase.from('pantry_items').insert({
+      name: item.name,
+      quantity: quantity || null,
+      unit: unit || null,
+      category: item.category ?? 'food',
+      household_id: profile?.household_id,
+      added_by: profile?.display_name,
+    })
+    setPantryPrompt(null)
   }
 
   function deleteItem(item: ShoppingItem) {
@@ -63,6 +106,9 @@ export default function ShoppingPage() {
     const { data } = await supabase.from('shopping_items').insert({
       name: pendingDelete.name,
       quantity: pendingDelete.quantity,
+      pcs: pendingDelete.pcs,
+      amount_per_pack: pendingDelete.amount_per_pack,
+      unit: pendingDelete.unit,
       store: pendingDelete.store,
       category: pendingDelete.category ?? 'other',
       is_ticked: pendingDelete.is_ticked,
@@ -106,31 +152,56 @@ export default function ShoppingPage() {
 
         <div className="space-y-2 mb-4">
           {items.map((item) => (
-            <div key={item.id} className="flex items-center gap-3 bg-white rounded-xl px-3 py-2.5 border border-slate-100">
-              <button
-                onClick={() => toggleChecked(item)}
-                className={`w-6 h-6 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-colors ${
-                  item.is_ticked ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-slate-300'
-                }`}
-              >
-                {item.is_ticked && <span className="text-xs">✓</span>}
-              </button>
+            <div key={item.id}>
+              <div className="flex items-center gap-3 bg-white rounded-xl px-3 py-2.5 border border-slate-100">
+                <button
+                  onClick={() => toggleChecked(item)}
+                  className={`w-6 h-6 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-colors ${
+                    item.is_ticked ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-slate-300'
+                  }`}
+                >
+                  {item.is_ticked && <span className="text-xs">✓</span>}
+                </button>
 
-              <div className="flex-1 min-w-0">
-                <p className={`text-sm font-medium transition-all ${item.is_ticked ? 'line-through text-slate-400' : 'text-slate-700'}`}>
-                  {item.name}
-                </p>
-                <p className="text-xs text-slate-400">
-                  {[item.quantity, item.added_by ? `by ${item.added_by}` : null].filter(Boolean).join(' · ')}
-                </p>
+                <div className="flex-1 min-w-0">
+                  <p className={`text-sm font-medium transition-all ${item.is_ticked ? 'line-through text-slate-400' : 'text-slate-700'}`}>
+                    {item.name}
+                  </p>
+                  <p className="text-xs text-slate-400">
+                    {[formatQuantity(item), item.added_by ? `by ${item.added_by}` : null].filter(Boolean).join(' · ')}
+                  </p>
+                </div>
+
+                <button onClick={() => setEditItem(item)} className="text-slate-300 hover:text-slate-500 text-sm transition-colors px-1">
+                  ✏️
+                </button>
+                <button onClick={() => deleteItem(item)} className="text-slate-300 hover:text-red-400 text-lg transition-colors">
+                  ✕
+                </button>
               </div>
 
-              <button onClick={() => setEditItem(item)} className="text-slate-300 hover:text-slate-500 text-sm transition-colors px-1">
-                ✏️
-              </button>
-              <button onClick={() => deleteItem(item)} className="text-slate-300 hover:text-red-400 text-lg transition-colors">
-                ✕
-              </button>
+              {/* Pantry prompt — appears inline below the ticked item */}
+              {pantryPrompt?.id === item.id && (
+                <div className="flex items-center justify-between bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2 mt-1">
+                  <p className="text-xs text-emerald-700 font-medium truncate mr-2">
+                    Add <span className="font-bold">{item.name}</span> · {pantryTotal(item).quantity}{pantryTotal(item).unit ? ` ${pantryTotal(item).unit}` : ''} to pantry?
+                  </p>
+                  <div className="flex gap-2 flex-shrink-0">
+                    <button
+                      onClick={() => addToPantry(item)}
+                      className="text-xs font-semibold text-white bg-emerald-500 hover:bg-emerald-600 px-2.5 py-1 rounded-lg transition-colors"
+                    >
+                      {t('smodal_add_to_pantry')}
+                    </button>
+                    <button
+                      onClick={() => setPantryPrompt(null)}
+                      className="text-xs font-medium text-slate-500 hover:text-slate-700 px-2 py-1 rounded-lg transition-colors"
+                    >
+                      {t('smodal_skip')}
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           ))}
 
