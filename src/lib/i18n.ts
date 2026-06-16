@@ -56,6 +56,7 @@ const T = {
     // Menu
     menu_this_week: 'This Week', menu_next_week: 'Next Week',
     menu_no_meals: 'No meals planned',
+    menu_no_ingredients: 'No ingredients recorded',
     menu_add_missing: '🛒 Add missing',
     menu_cooked_btn: '✅ Cooked',
     menu_cooked_badge: '· ✅ Cooked',
@@ -225,6 +226,7 @@ const T = {
 
     menu_this_week: 'See nädal', menu_next_week: 'Järgmine nädal',
     menu_no_meals: 'Sööke pole planeeritud',
+    menu_no_ingredients: 'Koostisosad puuduvad',
     menu_add_missing: '🛒 Lisa puuduvad',
     menu_cooked_btn: '✅ Valmis',
     menu_cooked_badge: '· ✅ Valmis',
@@ -382,6 +384,7 @@ const T = {
 
     menu_this_week: 'Эта неделя', menu_next_week: 'Следующая неделя',
     menu_no_meals: 'Приёмы пищи не запланированы',
+    menu_no_ingredients: 'Ингредиенты не записаны',
     menu_add_missing: '🛒 Добавить недостающее',
     menu_cooked_btn: '✅ Готово',
     menu_cooked_badge: '· ✅ Приготовлено',
