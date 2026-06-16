@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
-import { useAuth } from '@/contexts/AuthContext'
 import { useT } from '@/lib/i18n'
 
 interface Meal {
@@ -31,14 +30,12 @@ interface Props {
 }
 
 export default function MarkCookedModal({ meal, onClose, onCooked }: Props) {
-  const { profile } = useAuth()
   const t = useT()
-  const [ingredients, setIngredients]   = useState<Ingredient[]>([])
-  const [pantrySnaps, setPantrySnaps]   = useState<Record<string, PantrySnap>>({})
-  const [checked, setChecked]           = useState<Set<string>>(new Set())
-  const [deductAmounts, setDeductAmounts] = useState<Record<string, string>>({})
-  const [loading, setLoading]           = useState(true)
-  const [saving, setSaving]             = useState(false)
+  const [ingredients, setIngredients] = useState<Ingredient[]>([])
+  const [pantrySnaps, setPantrySnaps] = useState<Record<string, PantrySnap>>({})
+  const [checked, setChecked]         = useState<Set<string>>(new Set())
+  const [loading, setLoading]         = useState(true)
+  const [saving, setSaving]           = useState(false)
 
   useEffect(() => {
     async function load() {
@@ -49,48 +46,48 @@ export default function MarkCookedModal({ meal, onClose, onCooked }: Props) {
       const ings = (data ?? []) as Ingredient[]
       setIngredients(ings)
 
-      // Load pantry quantities for all linked ingredients
       const linked = ings.filter(i => i.pantry_item_id)
       const snaps: Record<string, PantrySnap> = {}
-      const amounts: Record<string, string> = {}
-
       for (const ing of linked) {
         const { data: p } = await supabase
           .from('pantry_items')
           .select('quantity, unit')
           .eq('id', ing.pantry_item_id!)
           .single()
-        if (p) {
-          snaps[ing.id] = p as PantrySnap
-          // Pre-fill deduct amount only when units match
-          if (p.unit === ing.unit && ing.quantity) {
-            amounts[ing.id] = ing.quantity
-          }
-        }
+        if (p) snaps[ing.id] = p as PantrySnap
       }
-
       setPantrySnaps(snaps)
-      setDeductAmounts(amounts)
-      setChecked(new Set(linked.map(i => i.id)))
+
+      // Pre-check only ingredients we can auto-deduct
+      const autoCheckable = linked.filter(ing => {
+        const snap = snaps[ing.id]
+        return snap && ing.unit && snap.unit && ing.unit === snap.unit
+          && ing.quantity && parseFloat(ing.quantity) > 0
+      })
+      setChecked(new Set(autoCheckable.map(i => i.id)))
       setLoading(false)
     }
     load()
   }, [meal.id])
 
+  function canDeduct(ing: Ingredient): boolean {
+    const snap = pantrySnaps[ing.id]
+    return !!snap && !!ing.unit && !!snap.unit && ing.unit === snap.unit
+      && !!ing.quantity && parseFloat(ing.quantity) > 0
+  }
+
   async function confirmCook() {
     setSaving(true)
 
-    const toDeduct = ingredients.filter(i => checked.has(i.id) && i.pantry_item_id)
+    const toDeduct = ingredients.filter(i => checked.has(i.id) && i.pantry_item_id && canDeduct(i))
 
     for (const ing of toDeduct) {
       const snap = pantrySnaps[ing.id]
-      if (!snap) continue
+      if (!snap || !ing.quantity) continue
 
-      const deductStr = deductAmounts[ing.id]?.trim()
-      const deductQty = parseFloat(deductStr ?? 'NaN')
+      const deductQty = parseFloat(ing.quantity)
       const currentQty = parseFloat(snap.quantity ?? 'NaN')
 
-      // Skip if no valid deduct amount entered
       if (isNaN(deductQty) || deductQty <= 0) continue
 
       if (!isNaN(currentQty)) {
@@ -104,7 +101,6 @@ export default function MarkCookedModal({ meal, onClose, onCooked }: Props) {
           await supabase.from('pantry_items').delete().eq('id', ing.pantry_item_id!)
         }
       } else {
-        // Pantry had no numeric quantity — just delete it
         await supabase.from('pantry_items').delete().eq('id', ing.pantry_item_id!)
       }
     }
@@ -114,16 +110,21 @@ export default function MarkCookedModal({ meal, onClose, onCooked }: Props) {
       .update({ cooked_at: new Date().toISOString() })
       .eq('id', meal.id)
 
-    void profile
     setSaving(false)
     onCooked()
   }
 
+  function toggleChecked(id: string) {
+    setChecked(prev => {
+      const s = new Set(prev)
+      s.has(id) ? s.delete(id) : s.add(id)
+      return s
+    })
+  }
+
   const pantryLinked = ingredients.filter(i => i.pantry_item_id)
   const notLinked    = ingredients.filter(i => !i.pantry_item_id)
-  const willDeduct   = pantryLinked.filter(i =>
-    checked.has(i.id) && parseFloat(deductAmounts[i.id] ?? 'NaN') > 0
-  ).length
+  const willDeduct   = pantryLinked.filter(i => checked.has(i.id) && canDeduct(i)).length
 
   const btnLabel = saving
     ? t('saving')
@@ -163,47 +164,41 @@ export default function MarkCookedModal({ meal, onClose, onCooked }: Props) {
                   <div className="space-y-1">
                     {pantryLinked.map(ing => {
                       const snap = pantrySnaps[ing.id]
-                      const unitsMatch = snap?.unit === ing.unit
-                      const hint = [ing.quantity, ing.unit].filter(Boolean).join(' ')
+                      const deductable = canDeduct(ing)
+                      const unitsMatch = snap && ing.unit && snap.unit && ing.unit === snap.unit
+                      const hasQty = ing.quantity && parseFloat(ing.quantity) > 0
+                      const recipeHint = [ing.quantity, ing.unit].filter(Boolean).join(' ')
                       const pantryHint = snap ? `${t('cooked_pantry_has')} ${snap.quantity ?? '?'} ${snap.unit ?? ''}`.trim() : ''
 
                       return (
-                        <div key={ing.id} className="rounded-xl border border-slate-100 px-3 py-2.5">
-                          <div className="flex items-center gap-3">
+                        <div
+                          key={ing.id}
+                          className={`rounded-xl border px-3 py-2.5 flex items-start gap-3 ${
+                            deductable ? 'border-slate-100' : 'border-slate-50 opacity-50'
+                          }`}
+                        >
+                          {deductable ? (
                             <input
                               type="checkbox"
                               checked={checked.has(ing.id)}
-                              onChange={() => setChecked(prev => {
-                                const s = new Set(prev)
-                                s.has(ing.id) ? s.delete(ing.id) : s.add(ing.id)
-                                return s
-                              })}
-                              className="w-4 h-4 accent-emerald-500 flex-shrink-0"
+                              onChange={() => toggleChecked(ing.id)}
+                              className="w-4 h-4 mt-0.5 accent-emerald-500 flex-shrink-0"
                             />
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm font-medium text-slate-700">{ing.name}</p>
-                              <p className="text-xs text-slate-400">
-                                {[hint ? `recipe: ${hint}` : null, pantryHint].filter(Boolean).join(' · ')}
-                              </p>
-                            </div>
-                          </div>
-
-                          {checked.has(ing.id) && (
-                            <div className="mt-2 ml-7 flex items-center gap-2">
-                              <input
-                                type="number"
-                                inputMode="decimal"
-                                value={deductAmounts[ing.id] ?? ''}
-                                onChange={e => setDeductAmounts(prev => ({ ...prev, [ing.id]: e.target.value }))}
-                                placeholder={unitsMatch ? (ing.quantity ?? '0') : '0'}
-                                className="w-24 px-3 py-1.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-emerald-400"
-                              />
-                              <span className="text-sm text-slate-500">{snap?.unit ?? ing.unit ?? ''}</span>
-                              {!unitsMatch && (
-                                <span className="text-xs text-amber-500">⚠️ units differ</span>
-                              )}
-                            </div>
+                          ) : (
+                            <div className="w-4 h-4 mt-0.5 rounded border border-slate-300 flex-shrink-0" />
                           )}
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-slate-700">{ing.name}</p>
+                            <p className="text-xs text-slate-400">
+                              {[recipeHint ? `${t('cooked_recipe')}: ${recipeHint}` : null, pantryHint].filter(Boolean).join(' · ')}
+                            </p>
+                            {!unitsMatch && snap && (
+                              <p className="text-xs text-amber-500 mt-0.5">⚠️ {t('cooked_units_differ')}</p>
+                            )}
+                            {!hasQty && (
+                              <p className="text-xs text-slate-400 mt-0.5">⚠️ {t('cooked_no_amount')}</p>
+                            )}
+                          </div>
                         </div>
                       )
                     })}
@@ -218,7 +213,12 @@ export default function MarkCookedModal({ meal, onClose, onCooked }: Props) {
                     {notLinked.map(ing => (
                       <div key={ing.id} className="flex items-center gap-3 py-2.5 px-3 opacity-40">
                         <div className="w-4 h-4 rounded border border-slate-300 flex-shrink-0" />
-                        <p className="text-sm text-slate-600">{ing.name}</p>
+                        <div>
+                          <p className="text-sm text-slate-600">{ing.name}</p>
+                          {(ing.quantity || ing.unit) && (
+                            <p className="text-xs text-slate-400">{[ing.quantity, ing.unit].filter(Boolean).join(' ')}</p>
+                          )}
+                        </div>
                       </div>
                     ))}
                   </div>

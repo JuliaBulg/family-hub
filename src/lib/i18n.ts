@@ -120,6 +120,9 @@ const T = {
     cooked_btn_plain: '✅ Mark as cooked',
     cooked_btn_deduct: '✅ Cooked — deduct {n} items from pantry',
     cooked_pantry_has: 'pantry:',
+    cooked_recipe: 'recipe',
+    cooked_units_differ: 'units differ',
+    cooked_no_amount: 'no amount',
 
     // Add Recipe
     recipe_add_title: '📖 New Recipe', recipe_edit_title: 'Edit Recipe',
@@ -280,6 +283,9 @@ const T = {
     cooked_btn_plain: '✅ Märgi valmistetuks',
     cooked_btn_deduct: '✅ Valmis — lahuta {n} toodet sahvrist',
     cooked_pantry_has: 'sahvris:',
+    cooked_recipe: 'retsept',
+    cooked_units_differ: 'ühikud erinevad',
+    cooked_no_amount: 'kogus puudub',
 
     recipe_add_title: '📖 Uus retsept', recipe_edit_title: 'Muuda retsepti',
     recipe_name_label: 'Retsepti nimi',
@@ -434,6 +440,9 @@ const T = {
     cooked_btn_plain: '✅ Отметить как приготовленное',
     cooked_btn_deduct: '✅ Приготовлено — списать {n}',
     cooked_pantry_has: 'в кладовой:',
+    cooked_recipe: 'рецепт',
+    cooked_units_differ: 'единицы различаются',
+    cooked_no_amount: 'нет количества',
 
     recipe_add_title: '📖 Новый рецепт', recipe_edit_title: 'Редактировать рецепт',
     recipe_name_label: 'Название рецепта',

@@ -173,16 +173,17 @@ export default function AddMealModal({ date, meal, onClose, onSaved }: Props) {
 
   async function addMissingToShopping() {
     const missing = ingredients.filter(i => !i.pantry_item_id)
-    if (missing.length === 0) return
+    if (missing.length === 0 || !profile?.household_id) return
     setAddingToShop(true)
-    await supabase.from('shopping_items').insert(
+    const { addToShoppingMerged } = await import('@/lib/shopping')
+    await addToShoppingMerged(
       missing.map(ing => ({
         name: ing.name,
-        quantity: ing.quantity ? `${ing.quantity}${ing.unit ? ' ' + ing.unit : ''}` : null,
-        is_ticked: false,
-        household_id: profile?.household_id,
-        added_by: profile?.display_name,
-      }))
+        amount_per_pack: ing.quantity ? parseFloat(ing.quantity) || null : null,
+        unit: ing.unit ?? null,
+      })),
+      profile.household_id,
+      profile?.display_name ?? null,
     )
     setAddingToShop(false)
     setShopAdded(true)

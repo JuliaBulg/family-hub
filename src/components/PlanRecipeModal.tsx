@@ -18,7 +18,11 @@ interface Props {
 }
 
 function todayStr() {
-  return new Date().toISOString().split('T')[0]
+  const d = new Date()
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
 }
 
 export default function PlanRecipeModal({ meal, onClose, onPlanned }: Props) {
@@ -81,23 +85,58 @@ export default function PlanRecipeModal({ meal, onClose, onPlanned }: Props) {
           })
         )
       }
-    } else if (meal.keyIngredients && meal.keyIngredients.length > 0) {
-      await supabase.from('meal_ingredients').insert(
-        meal.keyIngredients.map(name => {
-          const lower = name.toLowerCase()
-          const match = (pantryItems ?? []).find(p =>
-            p.name.toLowerCase().includes(lower) || lower.includes(p.name.toLowerCase())
-          )
-          return {
-            meal_id: newMeal.id,
-            household_id: profile?.household_id,
-            name,
-            quantity: null,
-            unit: null,
-            pantry_item_id: match?.id ?? null,
-          }
+    } else {
+      // Call AI to get quantities for this meal
+      try {
+        const res = await fetch('/api/meal-ingredients', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            mealName: meal.name,
+            servings,
+            pantryItems: pantryItems ?? [],
+            language: profile?.language ?? 'en',
+          }),
         })
-      )
+        const json = await res.json()
+        if (!res.ok || json.error) throw new Error()
+        const ings = (json.ingredients ?? []) as {
+          name: string; quantity: string | null; unit: string | null; pantry_item_id: string | null
+        }[]
+        if (ings.length > 0) {
+          await supabase.from('meal_ingredients').insert(
+            ings.map(ing => ({
+              meal_id: newMeal.id,
+              household_id: profile?.household_id,
+              name: ing.name,
+              quantity: ing.quantity,
+              unit: ing.unit,
+              pantry_item_id: ing.pantry_item_id,
+            }))
+          )
+        }
+      } catch {
+        // Fallback: save keyIngredients without quantities
+        const fallback = meal.keyIngredients ?? []
+        if (fallback.length > 0) {
+          await supabase.from('meal_ingredients').insert(
+            fallback.map(name => {
+              const lower = name.toLowerCase()
+              const match = (pantryItems ?? []).find(p =>
+                p.name.toLowerCase().includes(lower) || lower.includes(p.name.toLowerCase())
+              )
+              return {
+                meal_id: newMeal.id,
+                household_id: profile?.household_id,
+                name,
+                quantity: null,
+                unit: null,
+                pantry_item_id: match?.id ?? null,
+              }
+            })
+          )
+        }
+      }
     }
 
     setLoading(false)
