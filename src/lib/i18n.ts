@@ -119,6 +119,7 @@ const T = {
     cooked_no_ingredients: 'No ingredients recorded for this meal',
     cooked_btn_plain: '✅ Mark as cooked',
     cooked_btn_deduct: '✅ Cooked — deduct {n} items from pantry',
+    cooked_pantry_has: 'pantry:',
 
     // Add Recipe
     recipe_add_title: '📖 New Recipe', recipe_edit_title: 'Edit Recipe',
@@ -278,6 +279,7 @@ const T = {
     cooked_no_ingredients: 'Selle söögi koostisosad puuduvad',
     cooked_btn_plain: '✅ Märgi valmistetuks',
     cooked_btn_deduct: '✅ Valmis — lahuta {n} toodet sahvrist',
+    cooked_pantry_has: 'sahvris:',
 
     recipe_add_title: '📖 Uus retsept', recipe_edit_title: 'Muuda retsepti',
     recipe_name_label: 'Retsepti nimi',
@@ -431,6 +433,7 @@ const T = {
     cooked_no_ingredients: 'Ингредиенты для этого блюда не записаны',
     cooked_btn_plain: '✅ Отметить как приготовленное',
     cooked_btn_deduct: '✅ Приготовлено — списать {n}',
+    cooked_pantry_has: 'в кладовой:',
 
     recipe_add_title: '📖 Новый рецепт', recipe_edit_title: 'Редактировать рецепт',
     recipe_name_label: 'Название рецепта',
