@@ -24,6 +24,7 @@ export default function ShoppingPage() {
   const t = useT()
   const [items, setItems]               = useState<ShoppingItem[]>([])
   const [showModal, setShowModal]       = useState(false)
+  const [editItem, setEditItem]         = useState<ShoppingItem | null>(null)
   const [pendingDelete, setPendingDelete] = useState<ShoppingItem | null>(null)
   const undoTimerRef                    = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -124,6 +125,9 @@ export default function ShoppingPage() {
                 </p>
               </div>
 
+              <button onClick={() => setEditItem(item)} className="text-slate-300 hover:text-slate-500 text-sm transition-colors px-1">
+                ✏️
+              </button>
               <button onClick={() => deleteItem(item)} className="text-slate-300 hover:text-red-400 text-lg transition-colors">
                 ✕
               </button>
@@ -161,6 +165,14 @@ export default function ShoppingPage() {
         <AddShoppingItemModal
           onClose={() => setShowModal(false)}
           onAdded={fetchItems}
+        />
+      )}
+
+      {editItem && (
+        <AddShoppingItemModal
+          item={editItem}
+          onClose={() => setEditItem(null)}
+          onAdded={() => { setEditItem(null); void fetchItems() }}
         />
       )}
     </div>

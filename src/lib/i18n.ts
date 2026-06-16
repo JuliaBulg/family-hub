@@ -163,7 +163,7 @@ const T = {
     pmodal_update_btn: '✅ Update Item',
 
     // Shopping modal
-    smodal_title: 'Add to Shopping List',
+    smodal_title: 'Add to Shopping List', smodal_edit_title: 'Edit Item',
     smodal_name: 'Item name', smodal_qty: 'Quantity',
     smodal_add_btn: '✅ Add to List',
 
@@ -316,7 +316,7 @@ const T = {
     pmodal_save_btn: '✅ Salvesta toode',
     pmodal_update_btn: '✅ Uuenda toodet',
 
-    smodal_title: 'Lisa ostulistile',
+    smodal_title: 'Lisa ostulistile', smodal_edit_title: 'Muuda toodet',
     smodal_name: 'Toote nimi', smodal_qty: 'Kogus',
     smodal_add_btn: '✅ Lisa nimekirja',
 
@@ -468,7 +468,7 @@ const T = {
     pmodal_save_btn: '✅ Сохранить продукт',
     pmodal_update_btn: '✅ Обновить продукт',
 
-    smodal_title: 'Добавить в список покупок',
+    smodal_title: 'Добавить в список покупок', smodal_edit_title: 'Изменить товар',
     smodal_name: 'Название товара', smodal_qty: 'Количество',
     smodal_add_btn: '✅ Добавить в список',
 

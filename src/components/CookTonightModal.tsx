@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { supabase } from '@/lib/supabase'
+import { addToShoppingMerged } from '@/lib/shopping'
 import { useAuth } from '@/contexts/AuthContext'
 import PlanRecipeModal from '@/components/PlanRecipeModal'
 import { useT } from '@/lib/i18n'
@@ -93,16 +94,12 @@ export default function CookTonightModal({ items, onClose }: Props) {
   }
 
   async function addMissingToShopping(s: Suggestion, index: number) {
-    if (s.missing.length === 0) return
+    if (s.missing.length === 0 || !profile?.household_id) return
     setAddingToShop(index)
-    await supabase.from('shopping_items').insert(
-      s.missing.map(name => ({
-        name,
-        category: 'food',
-        is_ticked: false,
-        household_id: profile?.household_id,
-        added_by: profile?.display_name,
-      }))
+    await addToShoppingMerged(
+      s.missing.map(name => ({ name, quantity: null })),
+      profile.household_id,
+      profile?.display_name ?? null,
     )
     setAddedToShop(prev => new Set(prev).add(index))
     setAddingToShop(null)

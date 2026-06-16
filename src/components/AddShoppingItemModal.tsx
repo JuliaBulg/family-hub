@@ -6,34 +6,52 @@ import { useAuth } from '@/contexts/AuthContext'
 import { CATEGORIES } from '@/lib/categories'
 import { useT, useCatLabel } from '@/lib/i18n'
 
+interface ShoppingItem {
+  id: string
+  name: string
+  quantity: string | null
+  category: string | null
+}
+
 interface Props {
   onClose: () => void
   onAdded: () => void
+  item?: ShoppingItem
 }
 
-export default function AddShoppingItemModal({ onClose, onAdded }: Props) {
+export default function AddShoppingItemModal({ onClose, onAdded, item }: Props) {
   const { profile } = useAuth()
   const t = useT()
   const catLabel = useCatLabel()
-  const [name, setName]         = useState('')
-  const [quantity, setQuantity] = useState('')
-  const [category, setCategory] = useState('other')
+  const isEdit = !!item
+  const [name, setName]         = useState(item?.name ?? '')
+  const [quantity, setQuantity] = useState(item?.quantity ?? '')
+  const [category, setCategory] = useState(item?.category ?? 'other')
   const [saving, setSaving]     = useState(false)
   const [error, setError]       = useState('')
 
-  async function handleAdd() {
+  async function handleSave() {
     if (!name.trim()) { setError('Please enter an item name'); return }
     setSaving(true)
-    const { error: dbErr } = await supabase.from('shopping_items').insert({
-      name: name.trim(),
-      quantity: quantity.trim() || null,
-      category,
-      is_ticked: false,
-      household_id: profile?.household_id,
-      added_by: profile?.display_name,
-    })
-    setSaving(false)
-    if (dbErr) { setError('Could not save item. Please try again.'); return }
+    if (isEdit) {
+      const { error: dbErr } = await supabase
+        .from('shopping_items')
+        .update({ name: name.trim(), quantity: quantity.trim() || null, category })
+        .eq('id', item.id)
+      setSaving(false)
+      if (dbErr) { setError('Could not save item. Please try again.'); return }
+    } else {
+      const { error: dbErr } = await supabase.from('shopping_items').insert({
+        name: name.trim(),
+        quantity: quantity.trim() || null,
+        category,
+        is_ticked: false,
+        household_id: profile?.household_id,
+        added_by: profile?.display_name,
+      })
+      setSaving(false)
+      if (dbErr) { setError('Could not save item. Please try again.'); return }
+    }
     onAdded()
     onClose()
   }
@@ -50,7 +68,9 @@ export default function AddShoppingItemModal({ onClose, onAdded }: Props) {
         </div>
 
         <div className="flex items-center justify-between px-4 pt-2 pb-3 border-b border-slate-100">
-          <h2 className="text-lg font-bold text-slate-800">{t('smodal_title')}</h2>
+          <h2 className="text-lg font-bold text-slate-800">
+            {isEdit ? t('smodal_edit_title') : t('smodal_title')}
+          </h2>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600 text-2xl leading-none">✕</button>
         </div>
 
@@ -106,11 +126,11 @@ export default function AddShoppingItemModal({ onClose, onAdded }: Props) {
 
         <div className="px-4 py-4 border-t border-slate-100">
           <button
-            onClick={handleAdd}
+            onClick={handleSave}
             disabled={saving}
             className="w-full py-3 bg-emerald-500 hover:bg-emerald-600 active:bg-emerald-700 disabled:opacity-50 text-white font-semibold rounded-2xl text-base transition-colors shadow-sm"
           >
-            {saving ? t('saving') : t('smodal_add_btn')}
+            {saving ? t('saving') : isEdit ? t('btn_save') : t('smodal_add_btn')}
           </button>
         </div>
       </div>

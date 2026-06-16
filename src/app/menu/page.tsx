@@ -6,6 +6,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import AddMealModal from '@/components/AddMealModal'
 import MarkCookedModal from '@/components/MarkCookedModal'
 import { useT } from '@/lib/i18n'
+import { addToShoppingMerged } from '@/lib/shopping'
 
 type Slot = 'breakfast' | 'lunch' | 'dinner'
 
@@ -37,7 +38,10 @@ function getWeekDays(offset: number): Date[] {
 }
 
 function toDateStr(date: Date): string {
-  return date.toISOString().split('T')[0]
+  const y = date.getFullYear()
+  const m = String(date.getMonth() + 1).padStart(2, '0')
+  const d = String(date.getDate()).padStart(2, '0')
+  return `${y}-${m}-${d}`
 }
 
 function isToday(date: Date): boolean {
@@ -82,6 +86,7 @@ export default function MenuPage() {
   }
 
   async function addMissingToShopping(meal: Meal) {
+    if (!profile?.household_id) return
     setAddingMissing(meal.id)
 
     const { data: ings } = await supabase
@@ -92,15 +97,13 @@ export default function MenuPage() {
     const missing = (ings ?? []).filter(i => !i.pantry_item_id)
 
     if (missing.length > 0) {
-      await supabase.from('shopping_items').insert(
+      await addToShoppingMerged(
         missing.map(ing => ({
           name: ing.name,
           quantity: ing.quantity ? `${ing.quantity}${ing.unit ? ' ' + ing.unit : ''}` : null,
-          category: 'food',
-          is_ticked: false,
-          household_id: profile?.household_id,
-          added_by: profile?.display_name,
-        }))
+        })),
+        profile.household_id,
+        profile?.display_name ?? null,
       )
     }
 
