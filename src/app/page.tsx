@@ -17,6 +17,10 @@ interface PantryItem {
   unit: string | null
   expiry_date: string | null
   shopping_alert_dismissed: boolean
+  consumption_days: number | null
+  daily_usage: number | null
+  daily_usage_unit: string | null
+  date_opened: string | null
 }
 
 function isExpiringSoon(dateStr: string | null): boolean {
@@ -28,6 +32,21 @@ function isExpiringSoon(dateStr: string | null): boolean {
 function isExpired(dateStr: string | null): boolean {
   if (!dateStr) return false
   return new Date(dateStr).getTime() < Date.now()
+}
+
+function daysRemaining(item: { quantity: string | null; daily_usage: number | null; consumption_days: number | null; date_opened: string | null }): number | null {
+  // Rate-based: quantity / daily_usage
+  if (item.daily_usage && item.daily_usage > 0 && item.quantity) {
+    const qty = parseFloat(item.quantity)
+    if (!isNaN(qty)) return Math.round(qty / item.daily_usage)
+  }
+  // Duration-based: date_opened + consumption_days
+  if (item.consumption_days && item.consumption_days > 0) {
+    const opened = item.date_opened ? new Date(item.date_opened) : new Date()
+    const finishMs = opened.getTime() + item.consumption_days * 24 * 60 * 60 * 1000
+    return Math.round((finishMs - Date.now()) / (1000 * 60 * 60 * 24))
+  }
+  return null
 }
 
 function groupByName(items: PantryItem[]): PantryItem[][] {
@@ -218,11 +237,13 @@ export default function PantryPage() {
                 const reservation = group.map(i => reservations.get(i.id)).find(Boolean)
                 const qty         = groupQuantity(group)
                 const ids         = group.map(i => i.id)
+                const days        = daysRemaining(group[0])
+                const consumptionLow = days !== null && days <= 7
                 return (
                   <div
                     key={group[0].id}
                     className={`flex items-center gap-3 px-4 py-3 bg-white border rounded-xl ${
-                      anyExpired ? 'border-red-200' : anySoon ? 'border-amber-200' : reservation ? 'border-violet-200' : 'border-slate-100'
+                      anyExpired ? 'border-red-200' : anySoon || consumptionLow ? 'border-amber-200' : reservation ? 'border-violet-200' : 'border-slate-100'
                     }`}
                   >
                     <span className="text-lg flex-shrink-0">{cat?.emoji}</span>
@@ -236,6 +257,11 @@ export default function PantryPage() {
                             {' · ⏰ '}{t('pantry_expiring_section')}
                             {onList    && ` · 🛒 ${t('pantry_on_shopping')}`}
                             {wasOnList && ` · ${t('pantry_was_on_list')}`}
+                          </span>
+                        )}
+                        {days !== null && !anyExpired && !anySoon && (
+                          <span className={days <= 0 ? 'text-red-500' : days <= 7 ? 'text-amber-500' : 'text-slate-400'}>
+                            {' · '}{days <= 0 ? '⏳ running low' : `~${days}d left`}
                           </span>
                         )}
                         {reservation && (
@@ -380,11 +406,13 @@ export default function PantryPage() {
                         const reservation = group.map(i => reservations.get(i.id)).find(Boolean)
                         const qty         = groupQuantity(group)
                         const ids         = group.map(i => i.id)
+                        const days = daysRemaining(group[0])
+                        const consumptionLow = days !== null && days <= 7
                         return (
                           <div
                             key={group[0].id}
                             className={`flex items-center gap-3 px-4 py-3 bg-white border rounded-xl ${
-                              anyExpired ? 'border-red-200' : anySoon ? 'border-amber-200' : reservation ? 'border-violet-200' : 'border-slate-100'
+                              anyExpired ? 'border-red-200' : anySoon || consumptionLow ? 'border-amber-200' : reservation ? 'border-violet-200' : 'border-slate-100'
                             }`}
                           >
                             <div className="flex-1">
@@ -397,6 +425,11 @@ export default function PantryPage() {
                                     {' · ⏰ '}{t('pantry_expiring_section')}
                                     {onList    && ` · 🛒 ${t('pantry_on_shopping')}`}
                                     {wasOnList && ` · ${t('pantry_was_on_list')}`}
+                                  </span>
+                                )}
+                                {days !== null && !anyExpired && !anySoon && (
+                                  <span className={days <= 0 ? 'text-red-500' : days <= 7 ? 'text-amber-500' : 'text-slate-400'}>
+                                    {' · '}{days <= 0 ? '⏳ running low' : `~${days}d left`}
                                   </span>
                                 )}
                                 {reservation && (

@@ -1,9 +1,10 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
 import { useT, useCatLabel } from '@/lib/i18n'
+import { addToShoppingMerged } from '@/lib/shopping'
 
 type Category = 'food' | 'household' | 'drinks' | 'personal' | 'medicine' | 'pets' | 'other'
 
@@ -17,6 +18,35 @@ const CAT_META: { value: Category; emoji: string }[] = [
   { value: 'other',     emoji: '🧺' },
 ]
 
+// Product catalogue — base consumption rates
+interface CatalogEntry {
+  keywords: string[]
+  consumption_days?: number   // per person
+  daily_usage?: number        // per pet per day
+  daily_usage_unit?: string
+  per: 'person' | 'dog' | 'cat'
+}
+
+const CATALOGUE: CatalogEntry[] = [
+  { keywords: ['toothpaste', 'hambapasta', 'зубная паста'],               consumption_days: 45, per: 'person' },
+  { keywords: ['shampoo', 'šampoon', 'шампунь'],                          consumption_days: 30, per: 'person' },
+  { keywords: ['shower gel', 'dušigeel', 'гель для душа', 'bodywash'],    consumption_days: 25, per: 'person' },
+  { keywords: ['conditioner', 'palsam', 'кондиционер'],                   consumption_days: 45, per: 'person' },
+  { keywords: ['deodorant', 'дезодорант'],                                 consumption_days: 30, per: 'person' },
+  { keywords: ['soap', 'seep', 'мыло'],                                    consumption_days: 20, per: 'person' },
+  { keywords: ['mascara', 'тушь'],                                         consumption_days: 90, per: 'person' },
+  { keywords: ['face cream', 'näokreem', 'крем для лица', 'moisturizer'], consumption_days: 60, per: 'person' },
+  { keywords: ['dog food', 'koera toit', 'корм для собак'],               daily_usage: 300, daily_usage_unit: 'g', per: 'dog' },
+  { keywords: ['cat food', 'kassi toit', 'корм для кошек'],               daily_usage: 80,  daily_usage_unit: 'g', per: 'cat' },
+]
+
+interface Suggestion {
+  consumption_days?: number
+  daily_usage?: number
+  daily_usage_unit?: string
+  description: string
+}
+
 interface EditItem {
   id: string
   name: string
@@ -24,6 +54,10 @@ interface EditItem {
   quantity: string | null
   unit: string | null
   expiry_date: string | null
+  consumption_days: number | null
+  daily_usage: number | null
+  daily_usage_unit: string | null
+  date_opened: string | null
 }
 
 interface Props {
@@ -41,8 +75,60 @@ export default function AddPantryItemModal({ onClose, onAdded, editItem }: Props
   const [quantity, setQuantity]   = useState(editItem?.quantity ?? '')
   const [unit, setUnit]           = useState(editItem?.unit ?? '')
   const [expiryDate, setExpiryDate] = useState(editItem?.expiry_date ?? '')
-  const [loading, setLoading]     = useState(false)
-  const [error, setError]         = useState('')
+  const [consumptionDays, setConsumptionDays] = useState<string>(editItem?.consumption_days ? String(editItem.consumption_days) : '')
+  const [dailyUsage, setDailyUsage]           = useState<string>(editItem?.daily_usage ? String(editItem.daily_usage) : '')
+  const [dailyUsageUnit, setDailyUsageUnit]   = useState(editItem?.daily_usage_unit ?? '')
+  const [dateOpened, setDateOpened]           = useState(editItem?.date_opened ?? '')
+  const [suggestion, setSuggestion]           = useState<Suggestion | null>(null)
+  const [showConsumption, setShowConsumption] = useState(
+    !!(editItem?.consumption_days || editItem?.daily_usage)
+  )
+  const [sendingToShop, setSendingToShop] = useState(false)
+  const [sentToShop, setSentToShop]       = useState(false)
+  const [loading, setLoading]   = useState(false)
+  const [error, setError]       = useState('')
+
+  // Auto-suggest when name changes
+  useEffect(() => {
+    const lower = name.toLowerCase().trim()
+    if (!lower) { setSuggestion(null); return }
+
+    const entry = CATALOGUE.find(e => e.keywords.some(k => lower.includes(k)))
+    if (!entry) { setSuggestion(null); return }
+
+    if (entry.consumption_days && entry.per === 'person') {
+      const np = profile?.num_people ?? 1
+      const days = Math.round(entry.consumption_days / np)
+      setSuggestion({ consumption_days: days, description: `~${days} days for ${np} person${np > 1 ? 's' : ''}` })
+    } else if (entry.daily_usage && (entry.per === 'dog' || entry.per === 'cat')) {
+      const petCount = (profile?.pets ?? []).find(p => p.type === entry.per)?.count ?? 1
+      const total = entry.daily_usage * petCount
+      setSuggestion({ daily_usage: total, daily_usage_unit: entry.daily_usage_unit, description: `~${total}${entry.daily_usage_unit}/day for ${petCount} ${entry.per}${petCount > 1 ? 's' : ''}` })
+    } else {
+      setSuggestion(null)
+    }
+  }, [name, profile?.num_people, profile?.pets])
+
+  function applySuggestion() {
+    if (!suggestion) return
+    if (suggestion.consumption_days) setConsumptionDays(String(suggestion.consumption_days))
+    if (suggestion.daily_usage) setDailyUsage(String(suggestion.daily_usage))
+    if (suggestion.daily_usage_unit) setDailyUsageUnit(suggestion.daily_usage_unit)
+    setShowConsumption(true)
+  }
+
+  async function sendToShopping() {
+    if (!profile?.household_id || !name.trim()) return
+    setSendingToShop(true)
+    await addToShoppingMerged(
+      [{ name: name.trim(), amount_per_pack: quantity ? parseFloat(quantity) || null : null, unit: unit || null }],
+      profile.household_id,
+      profile.display_name ?? null,
+    )
+    setSendingToShop(false)
+    setSentToShop(true)
+    setTimeout(() => setSentToShop(false), 2000)
+  }
 
   async function handleSubmit() {
     if (!name.trim()) return
@@ -55,6 +141,10 @@ export default function AddPantryItemModal({ onClose, onAdded, editItem }: Props
       quantity: quantity.trim() || null,
       unit: unit.trim() || null,
       expiry_date: expiryDate || null,
+      consumption_days: consumptionDays ? parseInt(consumptionDays) || null : null,
+      daily_usage: dailyUsage ? parseFloat(dailyUsage) || null : null,
+      daily_usage_unit: dailyUsageUnit.trim() || null,
+      date_opened: dateOpened || null,
     }
 
     let dbErr = null
@@ -109,6 +199,7 @@ export default function AddPantryItemModal({ onClose, onAdded, editItem }: Props
 
         <div className="flex-1 min-h-0 overflow-y-scroll px-6 space-y-4 pb-4">
 
+          {/* Name */}
           <div>
             <label className="text-sm font-medium text-slate-600 mb-1 block">{t('pmodal_name')} *</label>
             <input
@@ -119,8 +210,21 @@ export default function AddPantryItemModal({ onClose, onAdded, editItem }: Props
               className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-400"
               autoFocus
             />
+            {/* Auto-suggest banner */}
+            {suggestion && !showConsumption && (
+              <div className="mt-1.5 flex items-center justify-between bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2">
+                <p className="text-xs text-emerald-700">{suggestion.description}</p>
+                <button
+                  onClick={applySuggestion}
+                  className="text-xs font-semibold text-emerald-600 hover:text-emerald-800 ml-2 flex-shrink-0"
+                >
+                  {t('pmodal_suggest_apply')}
+                </button>
+              </div>
+            )}
           </div>
 
+          {/* Category */}
           <div>
             <label className="text-sm font-medium text-slate-600 mb-1 block">{t('pmodal_category')} *</label>
             <div className="grid grid-cols-2 gap-2">
@@ -142,6 +246,7 @@ export default function AddPantryItemModal({ onClose, onAdded, editItem }: Props
             </div>
           </div>
 
+          {/* Quantity + Unit */}
           <div className="flex gap-3">
             <div className="flex-1">
               <label className="text-sm font-medium text-slate-600 mb-1 block">{t('pmodal_quantity')}</label>
@@ -165,6 +270,7 @@ export default function AddPantryItemModal({ onClose, onAdded, editItem }: Props
             </div>
           </div>
 
+          {/* Expiry date */}
           <div>
             <label className="text-sm font-medium text-slate-600 mb-1 block">
               {t('pmodal_expiry')} <span className="text-slate-400 font-normal">{t('pmodal_expiry_optional')}</span>
@@ -177,11 +283,83 @@ export default function AddPantryItemModal({ onClose, onAdded, editItem }: Props
             />
           </div>
 
-          {error && <p className="text-red-500 text-sm pb-2">{error}</p>}
+          {/* Consumption tracking */}
+          <div>
+            <button
+              type="button"
+              onClick={() => setShowConsumption(v => !v)}
+              className="text-sm font-medium text-slate-500 hover:text-emerald-600 flex items-center gap-1.5 transition-colors"
+            >
+              <span className="text-xs">{showConsumption ? '▲' : '▼'}</span>
+              {t('pmodal_consumption_label')}
+            </button>
 
+            {showConsumption && (
+              <div className="mt-3 space-y-3 pl-1">
+                {/* Lasts about X days */}
+                <div className="flex items-center gap-2">
+                  <label className="text-sm text-slate-600 w-28 flex-shrink-0">{t('pmodal_consumption_days')}</label>
+                  <input
+                    type="number"
+                    inputMode="numeric"
+                    value={consumptionDays}
+                    onChange={e => setConsumptionDays(e.target.value)}
+                    placeholder="45"
+                    className="w-20 px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 text-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                  />
+                  <span className="text-sm text-slate-400">{t('pmodal_consumption_days_unit')}</span>
+                </div>
+
+                {/* Daily usage */}
+                <div className="flex items-center gap-2">
+                  <label className="text-sm text-slate-600 w-28 flex-shrink-0">{t('pmodal_daily_usage_label')}</label>
+                  <input
+                    type="number"
+                    inputMode="decimal"
+                    value={dailyUsage}
+                    onChange={e => setDailyUsage(e.target.value)}
+                    placeholder="300"
+                    className="w-20 px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 text-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                  />
+                  <input
+                    type="text"
+                    value={dailyUsageUnit}
+                    onChange={e => setDailyUsageUnit(e.target.value)}
+                    placeholder="g"
+                    className="w-14 px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 text-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                  />
+                </div>
+
+                {/* Date opened */}
+                <div className="flex items-center gap-2">
+                  <label className="text-sm text-slate-600 w-28 flex-shrink-0">{t('pmodal_date_opened_label')}</label>
+                  <input
+                    type="date"
+                    value={dateOpened}
+                    onChange={e => setDateOpened(e.target.value)}
+                    className="flex-1 px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 text-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+
+          {error && <p className="text-red-500 text-sm pb-2">{error}</p>}
         </div>
 
-        <div className="flex-shrink-0 px-6 py-4 bg-white border-t border-slate-100">
+        <div className="flex-shrink-0 px-6 py-4 bg-white border-t border-slate-100 space-y-2">
+          {/* Send to shopping list — edit mode only */}
+          {editItem && (
+            <button
+              type="button"
+              onClick={() => void sendToShopping()}
+              disabled={sendingToShop || sentToShop}
+              className="w-full py-3 border border-emerald-200 bg-emerald-50 text-emerald-700 font-semibold rounded-2xl text-sm hover:bg-emerald-100 active:bg-emerald-200 disabled:opacity-60 transition-colors"
+            >
+              {sentToShop ? t('pmodal_sent_to_shop') : sendingToShop ? '…' : `🛒 ${t('pmodal_send_to_shop')}`}
+            </button>
+          )}
+
           <button
             type="button"
             onClick={handleSubmit}
