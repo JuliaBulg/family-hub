@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useAuth } from '@/contexts/AuthContext'
 import type { Pet } from '@/contexts/AuthContext'
@@ -28,6 +28,7 @@ interface Props {
 export default function ProfileSheet({ open, onClose }: Props) {
   const { user, profile, signOut, refreshProfile } = useAuth()
   const t = useT()
+
   const [householdName, setHouseholdName] = useState<string | null>(null)
   const [inviteCode, setInviteCode]       = useState<string | null>(null)
   const [inviteCopied, setInviteCopied]   = useState(false)
@@ -35,14 +36,23 @@ export default function ProfileSheet({ open, onClose }: Props) {
   const [updatingRole, setUpdatingRole]   = useState<string | null>(null)
   const [signingOut, setSigningOut]       = useState(false)
   const [mounted, setMounted]             = useState(false)
-  const [savingLang, setSavingLang]       = useState(false)
-  const [langSaved, setLangSaved]         = useState(false)
+
+  const [savingLang, setSavingLang] = useState(false)
+  const [langSaved, setLangSaved]   = useState(false)
+
   const [numPeople, setNumPeople]         = useState<number>(profile?.num_people ?? 1)
   const [pets, setPets]                   = useState<Pet[]>(profile?.pets ?? [])
   const [showPetPicker, setShowPetPicker] = useState(false)
   const [otherPetName, setOtherPetName]   = useState('')
-  const [householdSaving, setHouseholdSaving] = useState(false)
-  const [householdSaved, setHouseholdSaved]   = useState(false)
+  const [householdSaved, setHouseholdSaved] = useState(false)
+
+  // Refs for auto-save debounce
+  const saveTimer   = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const skipSave    = useRef(true)
+  const numPeopleRef = useRef(numPeople)
+  const petsRef      = useRef(pets)
+  numPeopleRef.current = numPeople
+  petsRef.current      = pets
 
   const LANGUAGES = [
     { code: 'en', flag: '🇬🇧', label: 'English' },
@@ -50,59 +60,43 @@ export default function ProfileSheet({ open, onClose }: Props) {
     { code: 'ru', flag: '🇷🇺', label: 'Русский'  },
   ]
 
-  // Sync household state when sheet opens
+  useEffect(() => { setMounted(true) }, [])
+
+  // Load household data when sheet opens
+  useEffect(() => {
+    if (!open || !profile?.household_id) return
+    supabase.from('households').select('name, invite_code').eq('id', profile.household_id).single()
+      .then(({ data }) => { setHouseholdName(data?.name ?? null); setInviteCode(data?.invite_code ?? null) })
+    supabase.from('profiles').select('user_id, display_name, role').eq('household_id', profile.household_id)
+      .then(({ data }) => setMembers(data ?? []))
+  }, [open, profile?.household_id])
+
+  // Sync people + pets from profile when sheet opens; skip auto-save during sync
   useEffect(() => {
     if (open && profile) {
+      skipSave.current = true
       setNumPeople(profile.num_people ?? 1)
       setPets(profile.pets ?? [])
+      const t = setTimeout(() => { skipSave.current = false }, 300)
+      return () => clearTimeout(t)
     }
-  }, [open, profile])
+    if (!open) skipSave.current = true
+  }, [open, profile?.num_people, profile?.pets])
 
-  async function saveHousehold() {
-    if (!user) return
-    setHouseholdSaving(true)
-    await supabase.from('profiles')
-      .update({ num_people: numPeople, pets })
-      .eq('user_id', user.id)
-    await refreshProfile()
-    setHouseholdSaving(false)
-    setHouseholdSaved(true)
-    setTimeout(() => setHouseholdSaved(false), 2000)
-  }
-
-  function addPet(type: string) {
-    const existing = pets.findIndex(p => p.type === type)
-    if (existing >= 0) {
-      setPets(prev => prev.map((p, i) => i === existing ? { ...p, count: p.count + 1 } : p))
-    } else {
-      setPets(prev => [...prev, { type, count: 1 }])
-    }
-    setShowPetPicker(false)
-  }
-
-  function addOtherPet() {
-    const name = otherPetName.trim()
-    if (!name) return
-    const existing = pets.findIndex(p => p.type === name.toLowerCase())
-    if (existing >= 0) {
-      setPets(prev => prev.map((p, i) => i === existing ? { ...p, count: p.count + 1 } : p))
-    } else {
-      setPets(prev => [...prev, { type: name.toLowerCase(), count: 1 }])
-    }
-    setOtherPetName('')
-    setShowPetPicker(false)
-  }
-
-  function updatePetCount(idx: number, delta: number) {
-    setPets(prev => {
-      const updated = prev.map((p, i) => i === idx ? { ...p, count: p.count + delta } : p)
-      return updated.filter(p => p.count > 0)
-    })
-  }
-
-  function removePet(idx: number) {
-    setPets(prev => prev.filter((_, i) => i !== idx))
-  }
+  // Auto-save household with debounce
+  useEffect(() => {
+    if (skipSave.current || !user || !open) return
+    if (saveTimer.current) clearTimeout(saveTimer.current)
+    saveTimer.current = setTimeout(async () => {
+      await supabase.from('profiles')
+        .update({ num_people: numPeopleRef.current, pets: petsRef.current })
+        .eq('user_id', user.id)
+      await refreshProfile()
+      setHouseholdSaved(true)
+      setTimeout(() => setHouseholdSaved(false), 2000)
+    }, 800)
+    return () => { if (saveTimer.current) clearTimeout(saveTimer.current) }
+  }, [numPeople, pets])
 
   async function changeLanguage(lang: string) {
     if (!user) return
@@ -114,26 +108,6 @@ export default function ProfileSheet({ open, onClose }: Props) {
     setLangSaved(true)
     setTimeout(() => setLangSaved(false), 2000)
   }
-
-  useEffect(() => { setMounted(true) }, [])
-
-  useEffect(() => {
-    if (!open || !profile?.household_id) return
-    supabase
-      .from('households')
-      .select('name, invite_code')
-      .eq('id', profile.household_id)
-      .single()
-      .then(({ data }) => {
-        setHouseholdName(data?.name ?? null)
-        setInviteCode(data?.invite_code ?? null)
-      })
-    supabase
-      .from('profiles')
-      .select('user_id, display_name, role')
-      .eq('household_id', profile.household_id)
-      .then(({ data }) => setMembers(data ?? []))
-  }, [open, profile?.household_id])
 
   async function changeRole(userId: string, newRole: 'parent' | 'child') {
     setUpdatingRole(userId)
@@ -154,11 +128,32 @@ export default function ProfileSheet({ open, onClose }: Props) {
     setTimeout(() => setInviteCopied(false), 2000)
   }
 
-  if (!open || !mounted) return null
+  function addPet(type: string) {
+    setPets(prev => {
+      const idx = prev.findIndex(p => p.type === type)
+      return idx >= 0 ? prev.map((p, i) => i === idx ? { ...p, count: p.count + 1 } : p) : [...prev, { type, count: 1 }]
+    })
+    setShowPetPicker(false)
+  }
 
-  const initials = profile?.display_name
-    ? profile.display_name.trim().split(/\s+/).map((w: string) => w[0]).join('').toUpperCase().slice(0, 2)
-    : '?'
+  function addOtherPet() {
+    const name = otherPetName.trim().toLowerCase()
+    if (!name) return
+    setPets(prev => {
+      const idx = prev.findIndex(p => p.type === name)
+      return idx >= 0 ? prev.map((p, i) => i === idx ? { ...p, count: p.count + 1 } : p) : [...prev, { type: name, count: 1 }]
+    })
+    setOtherPetName('')
+    setShowPetPicker(false)
+  }
+
+  function updatePetCount(idx: number, delta: number) {
+    setPets(prev => prev.map((p, i) => i === idx ? { ...p, count: p.count + delta } : p).filter(p => p.count > 0))
+  }
+
+  function removePet(idx: number) {
+    setPets(prev => prev.filter((_, i) => i !== idx))
+  }
 
   async function handleSignOut() {
     setSigningOut(true)
@@ -166,57 +161,36 @@ export default function ProfileSheet({ open, onClose }: Props) {
     onClose()
   }
 
+  if (!open || !mounted) return null
+
+  const initials = profile?.display_name
+    ? profile.display_name.trim().split(/\s+/).map((w: string) => w[0]).join('').toUpperCase().slice(0, 2)
+    : '?'
+
   return createPortal(
     <>
       <div className="fixed inset-0 z-40 bg-black/40" onClick={onClose} />
 
       <div className="fixed inset-0 z-50 flex items-center justify-center p-6">
         <div className="bg-white rounded-2xl w-full max-w-sm shadow-2xl flex flex-col" style={{ maxHeight: '90dvh' }}>
-          <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-slate-100">
+
+          {/* Header */}
+          <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-slate-100 flex-shrink-0">
             <h2 className="text-base font-semibold text-slate-700">{t('profile_account')}</h2>
             <button
               onClick={onClose}
-              aria-label="Close"
-              className="w-8 h-8 flex items-center justify-center rounded-full bg-slate-100 text-slate-500 text-xl leading-none hover:bg-slate-200 active:bg-slate-300 transition-colors"
-            >
-              ×
-            </button>
+              className="w-8 h-8 flex items-center justify-center rounded-full bg-slate-100 text-slate-500 text-xl leading-none hover:bg-slate-200 transition-colors"
+            >×</button>
           </div>
 
-          <div className="px-6 py-5 overflow-y-auto flex-1">
-            {/* avatar + identity */}
-            <div className="flex items-center gap-4 mb-5">
-              <div className="w-14 h-14 rounded-full bg-emerald-500 flex items-center justify-center flex-shrink-0 shadow-sm">
-                <span className="text-white text-lg font-bold">{initials}</span>
-              </div>
-              <div className="min-w-0">
-                <p className="font-bold text-slate-800 text-base leading-tight truncate">
-                  {profile?.display_name ?? '—'}
-                </p>
-                <p className="text-slate-500 text-sm truncate">{user?.email}</p>
-                {householdName && (
-                  <p className="text-emerald-600 text-xs font-medium mt-0.5">🏠 {householdName}</p>
-                )}
-              </div>
-            </div>
+          <div className="overflow-y-auto flex-1 px-6 py-5 space-y-5">
 
-            {/* role badge */}
-            <div className="flex items-center gap-3 px-4 py-3 bg-slate-50 rounded-xl mb-5">
-              <span className="text-lg">{profile?.role === 'parent' ? '👩‍👧' : '🧒'}</span>
-              <div>
-                <p className="text-sm font-semibold text-slate-700 capitalize">
-                  {profile?.role ?? 'Member'}
-                </p>
-                <p className="text-xs text-slate-400">{t('profile_role_label')}</p>
-              </div>
-            </div>
-
-            {/* Language picker */}
-            <div className="mb-5">
+            {/* 1. Language */}
+            <div>
               <div className="flex items-center justify-between mb-2">
                 <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide">{t('profile_lang_label')}</p>
                 {savingLang && <p className="text-xs text-slate-400">{t('profile_lang_saving')}</p>}
-                {langSaved && <p className="text-xs text-emerald-600 font-medium">{t('profile_lang_saved')}</p>}
+                {langSaved  && <p className="text-xs text-emerald-600 font-medium">{t('profile_lang_saved')}</p>}
               </div>
               <div className="flex gap-2">
                 {LANGUAGES.map(lang => (
@@ -237,104 +211,27 @@ export default function ProfileSheet({ open, onClose }: Props) {
               </div>
             </div>
 
-            {/* Household settings — people + pets */}
-            <div className="mb-5">
-              <div className="flex items-center justify-between mb-2">
-                <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide">{t('profile_household_label')}</p>
-                <div className="flex items-center gap-2">
-                  {householdSaving && <p className="text-xs text-slate-400">{t('profile_household_saving')}</p>}
-                  {householdSaved  && <p className="text-xs text-emerald-600 font-medium">{t('profile_household_saved')}</p>}
-                  {!householdSaving && !householdSaved && (
-                    <button
-                      onClick={() => void saveHousehold()}
-                      className="text-xs font-semibold text-emerald-600 hover:text-emerald-700"
-                    >
-                      {t('profile_household_save')}
-                    </button>
-                  )}
-                </div>
+            <div className="border-t border-slate-100" />
+
+            {/* 2. Identity */}
+            <div className="flex items-center gap-4">
+              <div className="w-14 h-14 rounded-full bg-emerald-500 flex items-center justify-center flex-shrink-0 shadow-sm">
+                <span className="text-white text-lg font-bold">{initials}</span>
               </div>
-
-              {/* People stepper */}
-              <div className="flex items-center justify-between px-3 py-2.5 bg-slate-50 rounded-xl mb-2">
-                <p className="text-sm font-medium text-slate-700">{t('profile_people_label')}</p>
-                <div className="flex items-center gap-3">
-                  <button
-                    onClick={() => setNumPeople(n => Math.max(1, n - 1))}
-                    className="w-7 h-7 rounded-full bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold text-sm transition-colors"
-                  >−</button>
-                  <span className="text-sm font-bold text-slate-800 w-4 text-center">{numPeople}</span>
-                  <button
-                    onClick={() => setNumPeople(n => Math.min(20, n + 1))}
-                    className="w-7 h-7 rounded-full bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold text-sm transition-colors"
-                  >+</button>
+              <div className="min-w-0">
+                <p className="font-bold text-slate-800 text-base leading-tight truncate">{profile?.display_name ?? '—'}</p>
+                <p className="text-slate-500 text-sm truncate">{user?.email}</p>
+                <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                  {householdName && <p className="text-emerald-600 text-xs font-medium">🏠 {householdName}</p>}
+                  <span className="text-xs text-slate-300">·</span>
+                  <p className="text-xs text-slate-400 capitalize">{profile?.role === 'parent' ? '👩‍👧' : '🧒'} {profile?.role}</p>
                 </div>
-              </div>
-
-              {/* Pets */}
-              <div className="space-y-1.5">
-                <p className="text-xs text-slate-400 font-medium">{t('profile_pets_label')}</p>
-                {pets.map((pet, idx) => (
-                  <div key={idx} className="flex items-center gap-2 px-3 py-2 bg-slate-50 rounded-xl">
-                    <span className="text-base">{petEmoji(pet.type)}</span>
-                    <p className="text-sm text-slate-700 flex-1 capitalize">{pet.type}</p>
-                    <button onClick={() => updatePetCount(idx, -1)} className="w-6 h-6 rounded-full bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold text-xs transition-colors">−</button>
-                    <span className="text-sm font-bold text-slate-800 w-4 text-center">{pet.count}</span>
-                    <button onClick={() => updatePetCount(idx, +1)} className="w-6 h-6 rounded-full bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold text-xs transition-colors">+</button>
-                    <button onClick={() => removePet(idx)} className="text-slate-300 hover:text-red-400 text-base ml-1 transition-colors">✕</button>
-                  </div>
-                ))}
-
-                {/* Pet picker */}
-                {showPetPicker ? (
-                  <div className="border border-slate-200 rounded-xl overflow-hidden bg-white shadow-sm">
-                    {PET_TYPES.map(pt => (
-                      <button
-                        key={pt.type}
-                        onClick={() => addPet(pt.type)}
-                        className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-slate-700 hover:bg-emerald-50 hover:text-emerald-800 border-b border-slate-50 last:border-0 transition-colors"
-                      >
-                        <span>{pt.emoji}</span><span>{pt.label}</span>
-                      </button>
-                    ))}
-                    <div className="flex items-center gap-2 px-3 py-2 border-t border-slate-100">
-                      <input
-                        type="text"
-                        value={otherPetName}
-                        onChange={e => setOtherPetName(e.target.value)}
-                        onKeyDown={e => e.key === 'Enter' && addOtherPet()}
-                        placeholder={t('profile_pet_placeholder')}
-                        className="flex-1 text-sm px-2 py-1.5 border border-slate-200 rounded-lg focus:outline-none focus:border-emerald-400"
-                      />
-                      <button
-                        onClick={addOtherPet}
-                        disabled={!otherPetName.trim()}
-                        className="text-xs font-semibold text-emerald-600 disabled:text-slate-300 px-2"
-                      >
-                        {t('profile_household_save')}
-                      </button>
-                    </div>
-                    <button
-                      onClick={() => { setShowPetPicker(false); setOtherPetName('') }}
-                      className="w-full text-xs text-slate-400 py-1.5 hover:text-slate-600"
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                ) : (
-                  <button
-                    onClick={() => setShowPetPicker(true)}
-                    className="text-sm text-emerald-600 font-medium hover:text-emerald-700 px-1 py-1"
-                  >
-                    {t('profile_add_pet')}
-                  </button>
-                )}
               </div>
             </div>
 
-            {/* household members */}
+            {/* 3. Members */}
             {members.length > 0 && (
-              <div className="mb-5">
+              <div>
                 <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">
                   {householdName ?? 'Household'} · {members.length} member{members.length > 1 ? 's' : ''}
                 </p>
@@ -358,7 +255,7 @@ export default function ProfileSheet({ open, onClose }: Props) {
                           <button
                             onClick={() => void changeRole(m.user_id, m.role === 'parent' ? 'child' : 'parent')}
                             disabled={updatingRole === m.user_id}
-                            className="text-xs text-emerald-600 font-medium px-2 py-1 rounded-lg hover:bg-emerald-100 active:bg-emerald-200 disabled:opacity-40 transition-colors flex-shrink-0"
+                            className="text-xs text-emerald-600 font-medium px-2 py-1 rounded-lg hover:bg-emerald-100 disabled:opacity-40 transition-colors flex-shrink-0"
                           >
                             {updatingRole === m.user_id ? '…' : m.role === 'parent' ? '→ Child' : '→ Parent'}
                           </button>
@@ -370,11 +267,78 @@ export default function ProfileSheet({ open, onClose }: Props) {
               </div>
             )}
 
-            {/* invite link — parents only */}
+            {/* 4. Household settings */}
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide">{t('profile_household_label')}</p>
+                {householdSaved && <p className="text-xs text-emerald-600 font-medium">{t('profile_household_saved')}</p>}
+              </div>
+
+              {/* People stepper */}
+              <div className="flex items-center justify-between px-3 py-2.5 bg-slate-50 rounded-xl mb-2">
+                <p className="text-sm font-medium text-slate-700">{t('profile_people_label')}</p>
+                <div className="flex items-center gap-3">
+                  <button onClick={() => setNumPeople(n => Math.max(1, n - 1))} className="w-7 h-7 rounded-full bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold text-sm transition-colors">−</button>
+                  <span className="text-sm font-bold text-slate-800 w-4 text-center">{numPeople}</span>
+                  <button onClick={() => setNumPeople(n => Math.min(20, n + 1))} className="w-7 h-7 rounded-full bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold text-sm transition-colors">+</button>
+                </div>
+              </div>
+
+              {/* Pets */}
+              <div className="space-y-1.5">
+                <p className="text-xs text-slate-400 font-medium px-1">{t('profile_pets_label')}</p>
+                {pets.map((pet, idx) => (
+                  <div key={idx} className="flex items-center gap-2 px-3 py-2 bg-slate-50 rounded-xl">
+                    <span className="text-base">{petEmoji(pet.type)}</span>
+                    <p className="text-sm text-slate-700 flex-1 capitalize">{pet.type}</p>
+                    <button onClick={() => updatePetCount(idx, -1)} className="w-6 h-6 rounded-full bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold text-xs transition-colors">−</button>
+                    <span className="text-sm font-bold text-slate-800 w-4 text-center">{pet.count}</span>
+                    <button onClick={() => updatePetCount(idx, +1)} className="w-6 h-6 rounded-full bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold text-xs transition-colors">+</button>
+                    <button onClick={() => removePet(idx)} className="text-slate-300 hover:text-red-400 text-base ml-1 transition-colors">✕</button>
+                  </div>
+                ))}
+
+                {showPetPicker ? (
+                  <div className="border border-slate-200 rounded-xl overflow-hidden bg-white shadow-sm">
+                    {PET_TYPES.map(pt => (
+                      <button
+                        key={pt.type}
+                        onClick={() => addPet(pt.type)}
+                        className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-slate-700 hover:bg-emerald-50 hover:text-emerald-800 border-b border-slate-50 last:border-0 transition-colors"
+                      >
+                        <span>{pt.emoji}</span><span>{pt.label}</span>
+                      </button>
+                    ))}
+                    <div className="flex items-center gap-2 px-3 py-2 border-t border-slate-100">
+                      <input
+                        type="text"
+                        value={otherPetName}
+                        onChange={e => setOtherPetName(e.target.value)}
+                        onKeyDown={e => e.key === 'Enter' && addOtherPet()}
+                        placeholder={t('profile_pet_placeholder')}
+                        className="flex-1 text-sm px-2 py-1.5 border border-slate-200 rounded-lg focus:outline-none focus:border-emerald-400"
+                      />
+                      <button onClick={addOtherPet} disabled={!otherPetName.trim()} className="text-xs font-semibold text-emerald-600 disabled:text-slate-300 px-2">
+                        {t('profile_household_save')}
+                      </button>
+                    </div>
+                    <button onClick={() => { setShowPetPicker(false); setOtherPetName('') }} className="w-full text-xs text-slate-400 py-1.5 hover:text-slate-600">
+                      Cancel
+                    </button>
+                  </div>
+                ) : (
+                  <button onClick={() => setShowPetPicker(true)} className="text-sm text-emerald-600 font-medium hover:text-emerald-700 px-1 py-1">
+                    {t('profile_add_pet')}
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* 5. Actions */}
             {profile?.role === 'parent' && (
               <button
                 onClick={() => void copyInviteLink()}
-                className="w-full py-3 border border-emerald-200 bg-emerald-50 text-emerald-700 font-semibold rounded-xl text-sm hover:bg-emerald-100 active:bg-emerald-200 transition-colors mb-3"
+                className="w-full py-3 border border-emerald-200 bg-emerald-50 text-emerald-700 font-semibold rounded-xl text-sm hover:bg-emerald-100 transition-colors"
               >
                 {inviteCopied ? t('profile_invite_copied') : t('profile_invite')}
               </button>
@@ -383,10 +347,11 @@ export default function ProfileSheet({ open, onClose }: Props) {
             <button
               onClick={() => void handleSignOut()}
               disabled={signingOut}
-              className="w-full py-3 border border-slate-200 text-slate-600 font-semibold rounded-xl text-sm hover:bg-slate-50 active:bg-slate-100 disabled:opacity-60 transition-colors"
+              className="w-full py-3 border border-slate-200 text-slate-600 font-semibold rounded-xl text-sm hover:bg-slate-50 disabled:opacity-60 transition-colors"
             >
               {signingOut ? t('profile_signing_out') : t('profile_sign_out')}
             </button>
+
           </div>
         </div>
       </div>
