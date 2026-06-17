@@ -3,8 +3,22 @@
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useAuth } from '@/contexts/AuthContext'
+import type { Pet } from '@/contexts/AuthContext'
 import { supabase } from '@/lib/supabase'
 import { useT } from '@/lib/i18n'
+
+const PET_TYPES = [
+  { type: 'dog',    emoji: '🐕', label: 'Dog'    },
+  { type: 'cat',    emoji: '🐈', label: 'Cat'    },
+  { type: 'rabbit', emoji: '🐇', label: 'Rabbit' },
+  { type: 'bird',   emoji: '🐦', label: 'Bird'   },
+  { type: 'fish',   emoji: '🐠', label: 'Fish'   },
+]
+
+const PET_EMOJI: Record<string, string> = {
+  dog: '🐕', cat: '🐈', rabbit: '🐇', bird: '🐦', fish: '🐠',
+}
+function petEmoji(type: string) { return PET_EMOJI[type] ?? '🐾' }
 
 interface Props {
   open: boolean
@@ -21,14 +35,74 @@ export default function ProfileSheet({ open, onClose }: Props) {
   const [updatingRole, setUpdatingRole]   = useState<string | null>(null)
   const [signingOut, setSigningOut]       = useState(false)
   const [mounted, setMounted]             = useState(false)
-  const [savingLang, setSavingLang]   = useState(false)
-  const [langSaved, setLangSaved]     = useState(false)
+  const [savingLang, setSavingLang]       = useState(false)
+  const [langSaved, setLangSaved]         = useState(false)
+  const [numPeople, setNumPeople]         = useState<number>(profile?.num_people ?? 1)
+  const [pets, setPets]                   = useState<Pet[]>(profile?.pets ?? [])
+  const [showPetPicker, setShowPetPicker] = useState(false)
+  const [otherPetName, setOtherPetName]   = useState('')
+  const [householdSaving, setHouseholdSaving] = useState(false)
+  const [householdSaved, setHouseholdSaved]   = useState(false)
 
   const LANGUAGES = [
     { code: 'en', flag: '🇬🇧', label: 'English' },
     { code: 'et', flag: '🇪🇪', label: 'Eesti'   },
     { code: 'ru', flag: '🇷🇺', label: 'Русский'  },
   ]
+
+  // Sync household state when sheet opens
+  useEffect(() => {
+    if (open && profile) {
+      setNumPeople(profile.num_people ?? 1)
+      setPets(profile.pets ?? [])
+    }
+  }, [open, profile])
+
+  async function saveHousehold() {
+    if (!user) return
+    setHouseholdSaving(true)
+    await supabase.from('profiles')
+      .update({ num_people: numPeople, pets })
+      .eq('user_id', user.id)
+    await refreshProfile()
+    setHouseholdSaving(false)
+    setHouseholdSaved(true)
+    setTimeout(() => setHouseholdSaved(false), 2000)
+  }
+
+  function addPet(type: string) {
+    const existing = pets.findIndex(p => p.type === type)
+    if (existing >= 0) {
+      setPets(prev => prev.map((p, i) => i === existing ? { ...p, count: p.count + 1 } : p))
+    } else {
+      setPets(prev => [...prev, { type, count: 1 }])
+    }
+    setShowPetPicker(false)
+  }
+
+  function addOtherPet() {
+    const name = otherPetName.trim()
+    if (!name) return
+    const existing = pets.findIndex(p => p.type === name.toLowerCase())
+    if (existing >= 0) {
+      setPets(prev => prev.map((p, i) => i === existing ? { ...p, count: p.count + 1 } : p))
+    } else {
+      setPets(prev => [...prev, { type: name.toLowerCase(), count: 1 }])
+    }
+    setOtherPetName('')
+    setShowPetPicker(false)
+  }
+
+  function updatePetCount(idx: number, delta: number) {
+    setPets(prev => {
+      const updated = prev.map((p, i) => i === idx ? { ...p, count: p.count + delta } : p)
+      return updated.filter(p => p.count > 0)
+    })
+  }
+
+  function removePet(idx: number) {
+    setPets(prev => prev.filter((_, i) => i !== idx))
+  }
 
   async function changeLanguage(lang: string) {
     if (!user) return
@@ -97,7 +171,7 @@ export default function ProfileSheet({ open, onClose }: Props) {
       <div className="fixed inset-0 z-40 bg-black/40" onClick={onClose} />
 
       <div className="fixed inset-0 z-50 flex items-center justify-center p-6">
-        <div className="bg-white rounded-2xl w-full max-w-sm shadow-2xl">
+        <div className="bg-white rounded-2xl w-full max-w-sm shadow-2xl flex flex-col" style={{ maxHeight: '90dvh' }}>
           <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-slate-100">
             <h2 className="text-base font-semibold text-slate-700">{t('profile_account')}</h2>
             <button
@@ -109,7 +183,7 @@ export default function ProfileSheet({ open, onClose }: Props) {
             </button>
           </div>
 
-          <div className="px-6 py-5">
+          <div className="px-6 py-5 overflow-y-auto flex-1">
             {/* avatar + identity */}
             <div className="flex items-center gap-4 mb-5">
               <div className="w-14 h-14 rounded-full bg-emerald-500 flex items-center justify-center flex-shrink-0 shadow-sm">
@@ -160,6 +234,101 @@ export default function ProfileSheet({ open, onClose }: Props) {
                     <span className="text-xs mt-0.5">{lang.label}</span>
                   </button>
                 ))}
+              </div>
+            </div>
+
+            {/* Household settings — people + pets */}
+            <div className="mb-5">
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide">{t('profile_household_label')}</p>
+                <div className="flex items-center gap-2">
+                  {householdSaving && <p className="text-xs text-slate-400">{t('profile_household_saving')}</p>}
+                  {householdSaved  && <p className="text-xs text-emerald-600 font-medium">{t('profile_household_saved')}</p>}
+                  {!householdSaving && !householdSaved && (
+                    <button
+                      onClick={() => void saveHousehold()}
+                      className="text-xs font-semibold text-emerald-600 hover:text-emerald-700"
+                    >
+                      {t('profile_household_save')}
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* People stepper */}
+              <div className="flex items-center justify-between px-3 py-2.5 bg-slate-50 rounded-xl mb-2">
+                <p className="text-sm font-medium text-slate-700">{t('profile_people_label')}</p>
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => setNumPeople(n => Math.max(1, n - 1))}
+                    className="w-7 h-7 rounded-full bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold text-sm transition-colors"
+                  >−</button>
+                  <span className="text-sm font-bold text-slate-800 w-4 text-center">{numPeople}</span>
+                  <button
+                    onClick={() => setNumPeople(n => Math.min(20, n + 1))}
+                    className="w-7 h-7 rounded-full bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold text-sm transition-colors"
+                  >+</button>
+                </div>
+              </div>
+
+              {/* Pets */}
+              <div className="space-y-1.5">
+                <p className="text-xs text-slate-400 font-medium">{t('profile_pets_label')}</p>
+                {pets.map((pet, idx) => (
+                  <div key={idx} className="flex items-center gap-2 px-3 py-2 bg-slate-50 rounded-xl">
+                    <span className="text-base">{petEmoji(pet.type)}</span>
+                    <p className="text-sm text-slate-700 flex-1 capitalize">{pet.type}</p>
+                    <button onClick={() => updatePetCount(idx, -1)} className="w-6 h-6 rounded-full bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold text-xs transition-colors">−</button>
+                    <span className="text-sm font-bold text-slate-800 w-4 text-center">{pet.count}</span>
+                    <button onClick={() => updatePetCount(idx, +1)} className="w-6 h-6 rounded-full bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold text-xs transition-colors">+</button>
+                    <button onClick={() => removePet(idx)} className="text-slate-300 hover:text-red-400 text-base ml-1 transition-colors">✕</button>
+                  </div>
+                ))}
+
+                {/* Pet picker */}
+                {showPetPicker ? (
+                  <div className="border border-slate-200 rounded-xl overflow-hidden bg-white shadow-sm">
+                    {PET_TYPES.map(pt => (
+                      <button
+                        key={pt.type}
+                        onClick={() => addPet(pt.type)}
+                        className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-slate-700 hover:bg-emerald-50 hover:text-emerald-800 border-b border-slate-50 last:border-0 transition-colors"
+                      >
+                        <span>{pt.emoji}</span><span>{pt.label}</span>
+                      </button>
+                    ))}
+                    <div className="flex items-center gap-2 px-3 py-2 border-t border-slate-100">
+                      <input
+                        type="text"
+                        value={otherPetName}
+                        onChange={e => setOtherPetName(e.target.value)}
+                        onKeyDown={e => e.key === 'Enter' && addOtherPet()}
+                        placeholder={t('profile_pet_placeholder')}
+                        className="flex-1 text-sm px-2 py-1.5 border border-slate-200 rounded-lg focus:outline-none focus:border-emerald-400"
+                      />
+                      <button
+                        onClick={addOtherPet}
+                        disabled={!otherPetName.trim()}
+                        className="text-xs font-semibold text-emerald-600 disabled:text-slate-300 px-2"
+                      >
+                        {t('profile_household_save')}
+                      </button>
+                    </div>
+                    <button
+                      onClick={() => { setShowPetPicker(false); setOtherPetName('') }}
+                      className="w-full text-xs text-slate-400 py-1.5 hover:text-slate-600"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setShowPetPicker(true)}
+                    className="text-sm text-emerald-600 font-medium hover:text-emerald-700 px-1 py-1"
+                  >
+                    {t('profile_add_pet')}
+                  </button>
+                )}
               </div>
             </div>
 

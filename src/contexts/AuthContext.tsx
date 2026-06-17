@@ -4,11 +4,18 @@ import { createContext, useContext, useEffect, useRef, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { User } from '@supabase/supabase-js'
 
+export interface Pet {
+  type: string
+  count: number
+}
+
 export interface Profile {
   display_name: string
   household_id: string | null
   role: 'parent' | 'child'
   language: string
+  num_people: number
+  pets: Pet[]
 }
 
 interface AuthContextType {
@@ -39,10 +46,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const { data } = await supabase
         .from('profiles')
-        .select('display_name, household_id, role, language')
+        .select('display_name, household_id, role, language, num_people, pets')
         .eq('user_id', userId)
         .single()
-      setProfile(data ? { ...data, language: data.language ?? 'en' } : null)
+      setProfile(data ? { ...data, language: data.language ?? 'en', num_people: data.num_people ?? 1, pets: data.pets ?? [] } : null)
     } catch {
       setProfile(null)
     } finally {
