@@ -79,15 +79,46 @@ export default function CookTonightModal({ items, onClose }: Props) {
       .select('id')
       .single()
 
-    if (newRecipe && s.key_ingredients.length > 0) {
-      await supabase.from('recipe_ingredients').insert(
-        s.key_ingredients.map((name, i) => ({
+    if (newRecipe) {
+      type IngRow = { recipe_id: string; household_id: string | null; name: string; quantity: string | null; unit: string | null; sort_order: number }
+      let rows: IngRow[] = []
+
+      try {
+        const res = await fetch('/api/meal-ingredients', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ mealName: s.name, servings, language: profile?.language ?? 'en' }),
+        })
+        if (res.ok) {
+          const json = await res.json() as { ingredients?: { name: string; quantity: string | null; unit: string | null }[] }
+          if (json.ingredients?.length) {
+            rows = json.ingredients.map((ing, i) => ({
+              recipe_id: newRecipe.id,
+              household_id: profile?.household_id ?? null,
+              name: ing.name,
+              quantity: ing.quantity,
+              unit: ing.unit,
+              sort_order: i,
+            }))
+          }
+        }
+      } catch { /* ignore */ }
+
+      // Fall back to key_ingredients names if AI didn't return anything
+      if (rows.length === 0 && s.key_ingredients.length > 0) {
+        rows = s.key_ingredients.map((name, i) => ({
           recipe_id: newRecipe.id,
-          household_id: profile?.household_id,
+          household_id: profile?.household_id ?? null,
           name,
+          quantity: null,
+          unit: null,
           sort_order: i,
         }))
-      )
+      }
+
+      if (rows.length > 0) {
+        await supabase.from('recipe_ingredients').insert(rows)
+      }
     }
     setSaved(prev => new Set(prev).add(index))
     setSaving(null)
