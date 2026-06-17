@@ -4,7 +4,7 @@ import { useState, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
 import { CATEGORIES, type Category } from '@/lib/categories'
-import { useCatLabel } from '@/lib/i18n'
+import { useCatLabel, useT } from '@/lib/i18n'
 
 type Step = 'input' | 'parsing' | 'review' | 'expense'
 type Tab  = 'photo' | 'text'
@@ -26,6 +26,7 @@ interface Props {
 export default function ImportReceiptModal({ onClose, onAdded }: Props) {
   const { profile } = useAuth()
   const catLabel = useCatLabel()
+  const t = useT()
 
   const [step, setStep]                 = useState<Step>('input')
   const [tab, setTab]                   = useState<Tab>('photo')
@@ -37,11 +38,10 @@ export default function ImportReceiptModal({ onClose, onAdded }: Props) {
   const [error, setError]               = useState('')
   const [saving, setSaving]             = useState(false)
 
-  // Expense step: per-category amounts (editable) + store
-  const [expAmounts, setExpAmounts]   = useState<Partial<Record<Category, string>>>({})
+  const [expAmounts, setExpAmounts]     = useState<Partial<Record<Category, string>>>({})
   const [expCategories, setExpCategories] = useState<Category[]>([])
-  const [expStore, setExpStore]       = useState('')
-  const [expSaving, setExpSaving]     = useState(false)
+  const [expStore, setExpStore]         = useState('')
+  const [expSaving, setExpSaving]       = useState(false)
 
   const fileRef = useRef<HTMLInputElement>(null)
 
@@ -60,7 +60,7 @@ export default function ImportReceiptModal({ onClose, onAdded }: Props) {
     try {
       let body: object
       if (tab === 'photo') {
-        if (!imageFile) { setStep('input'); setError('Please select a file.'); return }
+        if (!imageFile) { setStep('input'); setError(t('receipt_error_no_file')); return }
         const isPdf = imageFile.type === 'application/pdf'
         body = {
           type: isPdf ? 'pdf' : 'image',
@@ -68,7 +68,7 @@ export default function ImportReceiptModal({ onClose, onAdded }: Props) {
           mediaType: imageFile.type,
         }
       } else {
-        if (!textInput.trim()) { setStep('input'); setError('Please paste some receipt text.'); return }
+        if (!textInput.trim()) { setStep('input'); setError(t('receipt_error_no_text')); return }
         body = { type: 'text', data: textInput }
       }
 
@@ -160,9 +160,8 @@ export default function ImportReceiptModal({ onClose, onAdded }: Props) {
     }
 
     setSaving(false)
-    if (insertError) { setError('Could not save items. Please try again.'); return }
+    if (insertError) { setError(t('receipt_error_save')); return }
 
-    // Build per-category totals from prices of selected items
     const totals: Partial<Record<Category, number>> = {}
     toAdd.forEach(item => {
       if (item.price != null) {
@@ -170,7 +169,6 @@ export default function ImportReceiptModal({ onClose, onAdded }: Props) {
       }
     })
 
-    // Categories present in selected items (with or without prices)
     const cats = [...new Set(toAdd.map(i => i.category))] as Category[]
     setExpCategories(cats)
     setExpAmounts(
@@ -212,6 +210,11 @@ export default function ImportReceiptModal({ onClose, onAdded }: Props) {
     return !isNaN(v) && v > 0
   })
 
+  const subtitle =
+    step === 'review'  ? t('receipt_subtitle_review').replace('{n}', String(parsedItems.length)) :
+    step === 'expense' ? t('receipt_subtitle_expense') :
+                         t('receipt_subtitle_input')
+
   return (
     <div className="fixed inset-0 bg-black/40 z-[200] flex items-start justify-center" onClick={onClose}>
       <div
@@ -226,13 +229,9 @@ export default function ImportReceiptModal({ onClose, onAdded }: Props) {
           )}
           <div className="flex-1">
             <h2 className="text-xl font-bold text-slate-800">
-              {step === 'expense' ? 'Log the expense?' : 'Import from Receipt'}
+              {step === 'expense' ? t('receipt_title_expense') : t('receipt_title')}
             </h2>
-            <p className="text-xs text-slate-400 mt-0.5">
-              {step === 'review'  ? `${parsedItems.length} items found — select what to add` :
-               step === 'expense' ? 'Items added to pantry. Adjust amounts and log.' :
-               'Upload a photo or paste receipt text'}
-            </p>
+            <p className="text-xs text-slate-400 mt-0.5">{subtitle}</p>
           </div>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600 text-2xl leading-none">✕</button>
         </div>
@@ -244,11 +243,11 @@ export default function ImportReceiptModal({ onClose, onAdded }: Props) {
           {(step === 'input' || step === 'parsing') && (
             <div className="space-y-4">
               <div className="flex bg-slate-100 rounded-2xl p-1 gap-1">
-                {(['photo', 'text'] as Tab[]).map(t => (
-                  <button key={t} onClick={() => setTab(t)}
-                    className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition-colors ${tab === t ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500'}`}
+                {(['photo', 'text'] as Tab[]).map(tabKey => (
+                  <button key={tabKey} onClick={() => setTab(tabKey)}
+                    className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition-colors ${tab === tabKey ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500'}`}
                   >
-                    {t === 'photo' ? '📷 Photo' : '📝 Paste Text'}
+                    {tabKey === 'photo' ? t('receipt_tab_photo') : t('receipt_tab_text')}
                   </button>
                 ))}
               </div>
@@ -277,7 +276,7 @@ export default function ImportReceiptModal({ onClose, onAdded }: Props) {
                       className="w-full h-40 border-2 border-dashed border-slate-200 rounded-2xl flex flex-col items-center justify-center gap-2 text-slate-400 hover:border-emerald-300 hover:text-emerald-500 transition-colors"
                     >
                       <span className="text-4xl">📷</span>
-                      <span className="text-sm font-medium">Photo, image or PDF receipt</span>
+                      <span className="text-sm font-medium">{t('receipt_upload_prompt')}</span>
                     </button>
                   )}
                 </div>
@@ -301,8 +300,8 @@ export default function ImportReceiptModal({ onClose, onAdded }: Props) {
           {step === 'review' && (
             <div className="space-y-2">
               <div className="flex items-center justify-between py-1">
-                <button onClick={() => setSelected(new Set(parsedItems.map((_, i) => i)))} className="text-xs text-emerald-600 font-medium">Select all</button>
-                <button onClick={() => setSelected(new Set())} className="text-xs text-slate-400">Deselect all</button>
+                <button onClick={() => setSelected(new Set(parsedItems.map((_, i) => i)))} className="text-xs text-emerald-600 font-medium">{t('receipt_select_all')}</button>
+                <button onClick={() => setSelected(new Set())} className="text-xs text-slate-400">{t('receipt_deselect_all')}</button>
               </div>
 
               {parsedItems.map((item, idx) => {
@@ -351,7 +350,7 @@ export default function ImportReceiptModal({ onClose, onAdded }: Props) {
           {/* EXPENSE */}
           {step === 'expense' && (
             <div className="space-y-4 pt-2">
-              <p className="text-xs text-slate-400">Amounts are pre-filled from item prices. Adjust if needed, or leave blank to skip a category.</p>
+              <p className="text-xs text-slate-400">{t('receipt_expense_hint')}</p>
 
               {expCategories.map(catValue => {
                 const cat = CATEGORIES.find(c => c.value === catValue)!
@@ -375,7 +374,9 @@ export default function ImportReceiptModal({ onClose, onAdded }: Props) {
               })}
 
               <div className="pt-1">
-                <label className="block text-sm font-medium text-slate-700 mb-1">Store <span className="text-slate-400 font-normal">(optional)</span></label>
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  {t('exp_modal_store')} <span className="text-slate-400 font-normal">{t('exp_modal_optional')}</span>
+                </label>
                 <input
                   type="text"
                   value={expStore}
@@ -393,27 +394,29 @@ export default function ImportReceiptModal({ onClose, onAdded }: Props) {
         {/* Footer */}
         <div className="flex-shrink-0 px-6 py-4 bg-white border-t border-slate-100">
           {step === 'input' && (
-            <button onClick={handleParse} disabled={tab === 'photo' ? !imagePreview : !textInput.trim()}
+            <button onClick={() => void handleParse()} disabled={tab === 'photo' ? !imagePreview : !textInput.trim()}
               className="w-full py-4 bg-emerald-500 hover:bg-emerald-600 active:bg-emerald-700 disabled:bg-slate-300 text-white font-semibold rounded-2xl text-base transition-colors"
             >
-              ✨ Parse with AI
+              {t('receipt_parse_btn')}
             </button>
           )}
           {step === 'parsing' && (
             <div className="w-full py-4 bg-slate-100 rounded-2xl flex flex-col items-center justify-center gap-1">
               <span className="text-slate-500 text-sm animate-pulse">
-                {imageFile?.type === 'application/pdf' ? 'Reading PDF…' : 'Analysing receipt…'}
+                {imageFile?.type === 'application/pdf' ? t('receipt_reading_pdf') : t('receipt_analysing')}
               </span>
               {imageFile?.type === 'application/pdf' && (
-                <span className="text-slate-400 text-xs">Large PDFs can take up to 30 seconds.</span>
+                <span className="text-slate-400 text-xs">{t('receipt_pdf_wait')}</span>
               )}
             </div>
           )}
           {step === 'review' && (
-            <button onClick={handleAddSelected} disabled={selectedCount === 0 || saving}
+            <button onClick={() => void handleAddSelected()} disabled={selectedCount === 0 || saving}
               className="w-full py-4 bg-emerald-500 hover:bg-emerald-600 active:bg-emerald-700 disabled:bg-slate-300 text-white font-semibold rounded-2xl text-base transition-colors"
             >
-              {saving ? 'Saving…' : `✅ Add ${selectedCount} item${selectedCount !== 1 ? 's' : ''} to Pantry`}
+              {saving
+                ? t('receipt_saving')
+                : t('receipt_add_btn').replace('{n}', String(selectedCount)).replace('{s}', selectedCount !== 1 ? 's' : '')}
             </button>
           )}
           {step === 'expense' && (
@@ -421,12 +424,12 @@ export default function ImportReceiptModal({ onClose, onAdded }: Props) {
               <button onClick={onClose}
                 className="flex-1 py-4 border border-slate-200 text-slate-600 font-semibold rounded-2xl text-base hover:bg-slate-50 transition-colors"
               >
-                Skip
+                {t('receipt_skip')}
               </button>
               <button onClick={() => void handleLogExpenses()} disabled={expSaving || !hasAnyExpAmount}
                 className="flex-1 py-4 bg-emerald-500 hover:bg-emerald-600 active:bg-emerald-700 disabled:bg-slate-300 text-white font-semibold rounded-2xl text-base transition-colors"
               >
-                {expSaving ? 'Saving…' : 'Log expenses'}
+                {expSaving ? t('receipt_saving') : t('receipt_log_btn')}
               </button>
             </div>
           )}

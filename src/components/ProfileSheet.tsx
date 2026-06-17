@@ -8,11 +8,11 @@ import { supabase } from '@/lib/supabase'
 import { useT } from '@/lib/i18n'
 
 const PET_TYPES = [
-  { type: 'dog',    emoji: '🐕', label: 'Dog'    },
-  { type: 'cat',    emoji: '🐈', label: 'Cat'    },
-  { type: 'rabbit', emoji: '🐇', label: 'Rabbit' },
-  { type: 'bird',   emoji: '🐦', label: 'Bird'   },
-  { type: 'fish',   emoji: '🐠', label: 'Fish'   },
+  { type: 'dog',    emoji: '🐕' },
+  { type: 'cat',    emoji: '🐈' },
+  { type: 'rabbit', emoji: '🐇' },
+  { type: 'bird',   emoji: '🐦' },
+  { type: 'fish',   emoji: '🐠' },
 ]
 
 const PET_EMOJI: Record<string, string> = {
@@ -224,7 +224,7 @@ export default function ProfileSheet({ open, onClose }: Props) {
                 <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                   {householdName && <p className="text-emerald-600 text-xs font-medium">🏠 {householdName}</p>}
                   <span className="text-xs text-slate-300">·</span>
-                  <p className="text-xs text-slate-400 capitalize">{profile?.role === 'parent' ? '👩‍👧' : '🧒'} {profile?.role}</p>
+                  <p className="text-xs text-slate-400">{profile?.role === 'parent' ? '👩‍👧' : '🧒'} {profile?.role === 'parent' ? t('profile_role_parent') : t('profile_role_child')}</p>
                 </div>
               </div>
             </div>
@@ -233,7 +233,7 @@ export default function ProfileSheet({ open, onClose }: Props) {
             {members.length > 0 && (
               <div>
                 <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">
-                  {householdName ?? 'Household'} · {members.length} member{members.length > 1 ? 's' : ''}
+                  {householdName ?? t('profile_household_label')} · {members.length} {members.length > 1 ? t('profile_members') : t('profile_member')}
                 </p>
                 <div className="space-y-1.5">
                   {members.map(m => {
@@ -247,9 +247,9 @@ export default function ProfileSheet({ open, onClose }: Props) {
                         </div>
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium text-slate-700 truncate">
-                            {m.display_name}{isMe && <span className="text-slate-400 font-normal"> (you)</span>}
+                            {m.display_name}{isMe && <span className="text-slate-400 font-normal"> ({t('profile_you')})</span>}
                           </p>
-                          <p className="text-xs text-slate-400 capitalize">{m.role}</p>
+                          <p className="text-xs text-slate-400">{m.role === 'parent' ? t('profile_role_parent') : t('profile_role_child')}</p>
                         </div>
                         {canEditRole && (
                           <button
@@ -257,7 +257,7 @@ export default function ProfileSheet({ open, onClose }: Props) {
                             disabled={updatingRole === m.user_id}
                             className="text-xs text-emerald-600 font-medium px-2 py-1 rounded-lg hover:bg-emerald-100 disabled:opacity-40 transition-colors flex-shrink-0"
                           >
-                            {updatingRole === m.user_id ? '…' : m.role === 'parent' ? '→ Child' : '→ Parent'}
+                            {updatingRole === m.user_id ? '…' : m.role === 'parent' ? t('profile_to_child') : t('profile_to_parent')}
                           </button>
                         )}
                       </div>
@@ -290,7 +290,7 @@ export default function ProfileSheet({ open, onClose }: Props) {
                 {pets.map((pet, idx) => (
                   <div key={idx} className="flex items-center gap-2 px-3 py-2 bg-slate-50 rounded-xl">
                     <span className="text-base">{petEmoji(pet.type)}</span>
-                    <p className="text-sm text-slate-700 flex-1 capitalize">{pet.type}</p>
+                    <p className="text-sm text-slate-700 flex-1 capitalize">{PET_EMOJI[pet.type] ? t(`profile_pet_${pet.type}` as Parameters<typeof t>[0]) : pet.type}</p>
                     <button onClick={() => updatePetCount(idx, -1)} className="w-6 h-6 rounded-full bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold text-xs transition-colors">−</button>
                     <span className="text-sm font-bold text-slate-800 w-4 text-center">{pet.count}</span>
                     <button onClick={() => updatePetCount(idx, +1)} className="w-6 h-6 rounded-full bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold text-xs transition-colors">+</button>
@@ -306,7 +306,7 @@ export default function ProfileSheet({ open, onClose }: Props) {
                         onClick={() => addPet(pt.type)}
                         className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-slate-700 hover:bg-emerald-50 hover:text-emerald-800 border-b border-slate-50 last:border-0 transition-colors"
                       >
-                        <span>{pt.emoji}</span><span>{pt.label}</span>
+                        <span>{pt.emoji}</span><span>{t(`profile_pet_${pt.type}` as Parameters<typeof t>[0])}</span>
                       </button>
                     ))}
                     <div className="flex items-center gap-2 px-3 py-2 border-t border-slate-100">
@@ -323,7 +323,7 @@ export default function ProfileSheet({ open, onClose }: Props) {
                       </button>
                     </div>
                     <button onClick={() => { setShowPetPicker(false); setOtherPetName('') }} className="w-full text-xs text-slate-400 py-1.5 hover:text-slate-600">
-                      Cancel
+                      {t('profile_cancel')}
                     </button>
                   </div>
                 ) : (

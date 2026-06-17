@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
 import { CATEGORIES, type Category } from '@/lib/categories'
-import { useCatLabel } from '@/lib/i18n'
+import { useCatLabel, useT } from '@/lib/i18n'
 
 interface Props {
   onClose: () => void
@@ -14,6 +14,7 @@ interface Props {
 export default function AddExpenseModal({ onClose, onAdded }: Props) {
   const { profile } = useAuth()
   const catLabel = useCatLabel()
+  const t = useT()
   const [amount, setAmount]       = useState('')
   const [category, setCategory]   = useState<Category | null>(null)
   const [store, setStore]         = useState('')
@@ -25,7 +26,7 @@ export default function AddExpenseModal({ onClose, onAdded }: Props) {
   async function submit() {
     if (!category || !amount) return
     const parsed = parseFloat(amount.replace(',', '.'))
-    if (isNaN(parsed) || parsed <= 0) { setError('Enter a valid amount.'); return }
+    if (isNaN(parsed) || parsed <= 0) { setError(t('exp_modal_invalid_amount')); return }
 
     setLoading(true)
     const { error: dbError } = await supabase.from('expenses').insert({
@@ -49,7 +50,7 @@ export default function AddExpenseModal({ onClose, onAdded }: Props) {
 
       <div className="relative w-full max-w-md bg-white rounded-t-3xl px-5 pt-5 pb-8 shadow-2xl">
         <div className="flex items-center justify-between mb-5">
-          <h2 className="text-base font-semibold text-slate-700">Add expense</h2>
+          <h2 className="text-base font-semibold text-slate-700">{t('exp_modal_title')}</h2>
           <button
             onClick={onClose}
             className="w-8 h-8 flex items-center justify-center rounded-full bg-slate-100 text-slate-500 text-xl leading-none"
@@ -60,7 +61,7 @@ export default function AddExpenseModal({ onClose, onAdded }: Props) {
 
         <div className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Amount (€)</label>
+            <label className="block text-sm font-medium text-slate-700 mb-1">{t('exp_modal_amount')}</label>
             <input
               type="number"
               inputMode="decimal"
@@ -73,7 +74,7 @@ export default function AddExpenseModal({ onClose, onAdded }: Props) {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-2">Category</label>
+            <label className="block text-sm font-medium text-slate-700 mb-2">{t('exp_modal_category')}</label>
             <div className="grid grid-cols-2 gap-2">
               {CATEGORIES.map(cat => (
                 <button
@@ -94,7 +95,9 @@ export default function AddExpenseModal({ onClose, onAdded }: Props) {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Store <span className="text-slate-400 font-normal">(optional)</span></label>
+            <label className="block text-sm font-medium text-slate-700 mb-1">
+              {t('exp_modal_store')} <span className="text-slate-400 font-normal">{t('exp_modal_optional')}</span>
+            </label>
             <input
               type="text"
               value={store}
@@ -105,7 +108,9 @@ export default function AddExpenseModal({ onClose, onAdded }: Props) {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Note <span className="text-slate-400 font-normal">(optional)</span></label>
+            <label className="block text-sm font-medium text-slate-700 mb-1">
+              {t('exp_modal_note')} <span className="text-slate-400 font-normal">{t('exp_modal_optional')}</span>
+            </label>
             <input
               type="text"
               value={note}
@@ -116,7 +121,7 @@ export default function AddExpenseModal({ onClose, onAdded }: Props) {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Date</label>
+            <label className="block text-sm font-medium text-slate-700 mb-1">{t('exp_modal_date')}</label>
             <input
               type="date"
               value={date}
@@ -134,7 +139,7 @@ export default function AddExpenseModal({ onClose, onAdded }: Props) {
             disabled={loading || !category || !amount}
             className="w-full py-3.5 bg-emerald-500 hover:bg-emerald-600 active:bg-emerald-700 disabled:opacity-60 text-white font-semibold rounded-xl text-sm transition-colors shadow-sm"
           >
-            {loading ? 'Saving…' : 'Save expense'}
+            {loading ? t('exp_modal_saving') : t('exp_modal_save')}
           </button>
         </div>
       </div>
