@@ -5,11 +5,15 @@ const client = new Anthropic()
 
 const SYSTEM_PROMPT = `You are a grocery receipt parser. Extract all product items from the receipt.
 
+Baltic/Estonian receipts often show a quantity multiplier line directly below the product name, in the format:
+  4,000 tk. X 1,29
+This means 4 pieces were bought at 1.29 each. The number uses a comma as the decimal separator (so "4,000 tk." = 4 pieces, "2,000 tk." = 2 pieces). When this multiplier line is present, use the piece count as quantity and "pcs" as unit — do NOT use the pack weight from the product name as the quantity.
+
 For each item return:
 - name: clean product name (no prices, quantities in the name, or item codes)
 - category: exactly one of "food", "household", "drinks", "personal", "medicine", "pets", "other"
-- quantity: numeric amount as a string if visible, otherwise null
-- unit: unit like "g", "kg", "L", "ml", "pcs", "bottle", "pack" — or null
+- quantity: if a "X,000 tk." multiplier line is present → that integer count as a string (e.g. "4"); otherwise the numeric amount from the product name as a string; otherwise null
+- unit: if a "X,000 tk." multiplier line is present → "pcs"; otherwise unit like "g", "kg", "L", "ml", "pcs", "bottle", "pack" — or null
 - price: the total line price for this item as a number (not unit price), or null if not visible
 - estimated_expiry_days: integer — estimated days from purchase until the item typically expires when refrigerated. Use these EU averages: milk 7, chicken/poultry 2, raw beef/pork/mince 3, vegetables 5, yogurt/kefir 14, hard cheese (cheddar/gouda) 21, soft cheese (mozzarella/brie/cream cheese/feta) 7, eggs 21, bread 5. For canned goods, dry pasta, rice, cleaning products, cosmetics, and other non-perishables return null.
 
