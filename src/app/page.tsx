@@ -543,6 +543,7 @@ export default function PantryPage() {
         <button
           onClick={() => setShowImportModal(true)}
           className="flex-1 py-3 bg-emerald-500 hover:bg-emerald-600 active:bg-emerald-700 text-white font-semibold rounded-xl text-sm transition-colors shadow-sm"
+          style={{ backgroundColor: '#10b981', color: '#fff' }}
         >
           {t('pantry_import_btn')}
         </button>
