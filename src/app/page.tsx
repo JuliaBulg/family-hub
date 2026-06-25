@@ -248,7 +248,7 @@ export default function PantryPage() {
   }
 
   return (
-    <div className="px-4 pt-3">
+    <div className="relative px-4 pt-3">
       {/* Header */}
       <div className="mb-3">
         <h1 className="text-xl font-bold text-slate-800">🏠 Home Hub</h1>
@@ -503,21 +503,8 @@ export default function PantryPage() {
         </>
       )}
 
-      {/* Buttons */}
-      <div className="flex gap-3 pb-4">
-        <button
-          onClick={() => setShowModal(true)}
-          className="flex-1 py-3 bg-emerald-500 hover:bg-emerald-600 active:bg-emerald-700 text-white font-semibold rounded-xl text-sm transition-colors shadow-sm"
-        >
-          {t('pantry_add_item')}
-        </button>
-        <button
-          onClick={() => setShowImportModal(true)}
-          className="flex-1 py-3 bg-emerald-500 hover:bg-emerald-600 active:bg-emerald-700 text-white font-semibold rounded-xl text-sm transition-colors shadow-sm"
-        >
-          {t('pantry_import_btn')}
-        </button>
-      </div>
+      {/* Spacer so sticky bar doesn't cover content */}
+      <div className="h-20" />
 
       {showModal && (
         <AddPantryItemModal
@@ -544,6 +531,22 @@ export default function PantryPage() {
       {showCookModal && (
         <CookTonightModal items={items} onClose={() => setShowCookModal(false)} />
       )}
+
+      {/* Sticky action bar */}
+      <div className="sticky bottom-0 bg-slate-50 pt-2 pb-4 flex gap-3">
+        <button
+          onClick={() => setShowModal(true)}
+          className="flex-1 py-3 bg-emerald-500 hover:bg-emerald-600 active:bg-emerald-700 text-white font-semibold rounded-xl text-sm transition-colors shadow-sm"
+        >
+          {t('pantry_add_item')}
+        </button>
+        <button
+          onClick={() => setShowImportModal(true)}
+          className="flex-1 py-3 bg-emerald-500 hover:bg-emerald-600 active:bg-emerald-700 text-white font-semibold rounded-xl text-sm transition-colors shadow-sm"
+        >
+          {t('pantry_import_btn')}
+        </button>
+      </div>
     </div>
   )
 }
