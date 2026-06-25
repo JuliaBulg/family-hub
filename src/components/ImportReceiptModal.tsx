@@ -43,7 +43,8 @@ export default function ImportReceiptModal({ onClose, onAdded }: Props) {
   const [expStore, setExpStore]         = useState('')
   const [expSaving, setExpSaving]       = useState(false)
 
-  const fileRef = useRef<HTMLInputElement>(null)
+  const fileRef    = useRef<HTMLInputElement>(null)
+  const bodyRef    = useRef<HTMLDivElement>(null)
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
@@ -185,6 +186,7 @@ export default function ImportReceiptModal({ onClose, onAdded }: Props) {
 
     onAdded()
     setStep('expense')
+    bodyRef.current?.scrollTo({ top: 0 })
   }
 
   async function handleLogExpenses() {
@@ -243,7 +245,7 @@ export default function ImportReceiptModal({ onClose, onAdded }: Props) {
         </div>
 
         {/* Body */}
-        <div className="flex-1 min-h-0 overflow-y-scroll px-6 pb-4">
+        <div ref={bodyRef} className="flex-1 min-h-0 overflow-y-scroll px-6 pb-4">
 
           {/* INPUT / PARSING */}
           {(step === 'input' || step === 'parsing') && (
