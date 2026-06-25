@@ -9,6 +9,12 @@ Baltic/Estonian receipts often show a quantity multiplier line directly below th
   4,000 tk. X 1,29
 This means 4 pieces were bought at 1.29 each. The number uses a comma as the decimal separator (so "4,000 tk." = 4 pieces, "2,000 tk." = 2 pieces). When this multiplier line is present, use the piece count as quantity and "pcs" as unit — do NOT use the pack weight from the product name as the quantity.
 
+SKIP (do not output as items) any line that is:
+- A discount/markdown adjustment: lines containing "Allah.", "Allahindlus", "Uus hind", or any line with a negative price that is not a standalone product
+- A loyalty/campaign section header: "SINU SOODUSTUSED", "Kampaania", "Boonuspunktid"
+- A receipt total, subtotal, VAT, or payment line: "KOKKU", "KM", "KAARDIMAKSEGA", "SULARAHA", "TAGASTUS", "JÄÄK", or any line that is clearly a monetary total rather than a purchased item
+- An item code, barcode row, or cashier/store metadata line
+
 For each item return:
 - name: clean product name (no prices, quantities in the name, or item codes)
 - category: exactly one of "food", "household", "drinks", "personal", "medicine", "pets", "other"
