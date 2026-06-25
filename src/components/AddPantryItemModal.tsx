@@ -208,7 +208,6 @@ export default function AddPantryItemModal({ onClose, onAdded, onDeleted, editIt
               onChange={(e) => setName(e.target.value)}
               placeholder={t('pmodal_name_placeholder')}
               className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-400"
-              autoFocus
             />
             {/* Auto-suggest banner */}
             {suggestion && !showConsumption && (
