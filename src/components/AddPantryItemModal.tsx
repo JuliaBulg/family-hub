@@ -5,18 +5,7 @@ import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
 import { useT, useCatLabel } from '@/lib/i18n'
 import { addToShoppingMerged } from '@/lib/shopping'
-
-type Category = 'food' | 'household' | 'drinks' | 'personal' | 'medicine' | 'pets' | 'other'
-
-const CAT_META: { value: Category; emoji: string }[] = [
-  { value: 'food',      emoji: '🛒' },
-  { value: 'drinks',    emoji: '🥤' },
-  { value: 'household', emoji: '🧹' },
-  { value: 'personal',  emoji: '🧴' },
-  { value: 'medicine',  emoji: '💊' },
-  { value: 'pets',      emoji: '🐾' },
-  { value: 'other',     emoji: '🧺' },
-]
+import { type Category, PANTRY_TOP_CATS, FOOD_SUBCATEGORIES, isFoodFamily } from '@/lib/categories'
 
 // Product catalogue — base consumption rates
 interface CatalogEntry {
@@ -71,7 +60,8 @@ export default function AddPantryItemModal({ onClose, onAdded, editItem }: Props
   const t = useT()
   const catLabel = useCatLabel()
   const [name, setName]           = useState(editItem?.name ?? '')
-  const [category, setCategory]   = useState<Category>(editItem?.category ?? 'food')
+  const defaultCat: Category = editItem?.category ?? 'food_other'
+  const [category, setCategory]   = useState<Category>(defaultCat)
   const [quantity, setQuantity]   = useState(editItem?.quantity ?? '')
   const [unit, setUnit]           = useState(editItem?.unit ?? '')
   const [expiryDate, setExpiryDate] = useState(editItem?.expiry_date ?? '')
@@ -227,23 +217,46 @@ export default function AddPantryItemModal({ onClose, onAdded, editItem }: Props
           {/* Category */}
           <div>
             <label className="text-sm font-medium text-slate-600 mb-1 block">{t('pmodal_category')} *</label>
-            <div className="grid grid-cols-2 gap-2">
-              {CAT_META.map((cat) => (
-                <button
-                  key={cat.value}
-                  type="button"
-                  onClick={() => setCategory(cat.value)}
-                  className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border text-sm font-medium transition-colors ${
-                    category === cat.value
-                      ? 'bg-emerald-500 text-white border-emerald-500'
-                      : 'bg-slate-50 text-slate-600 border-slate-200'
-                  }`}
-                >
-                  <span>{cat.emoji}</span>
-                  <span className="truncate">{catLabel(cat.value)}</span>
-                </button>
-              ))}
+            {/* Top-level row */}
+            <div className="grid grid-cols-5 gap-1.5 mb-2">
+              {PANTRY_TOP_CATS.map((cat) => {
+                const active = cat.value === 'food' ? isFoodFamily(category) : category === cat.value
+                return (
+                  <button
+                    key={cat.value}
+                    type="button"
+                    onClick={() => {
+                      if (cat.value === 'food') setCategory('food_other')
+                      else setCategory(cat.value)
+                    }}
+                    className={`flex flex-col items-center gap-0.5 py-2 rounded-xl border text-xs font-medium transition-colors ${
+                      active ? 'bg-emerald-500 text-white border-emerald-500' : 'bg-slate-50 text-slate-600 border-slate-200'
+                    }`}
+                  >
+                    <span className="text-lg">{cat.emoji}</span>
+                    <span className="truncate text-[10px]">{catLabel(cat.value)}</span>
+                  </button>
+                )
+              })}
             </div>
+            {/* Food sub-category row */}
+            {isFoodFamily(category) && (
+              <div className="grid grid-cols-3 gap-1.5">
+                {FOOD_SUBCATEGORIES.map((sub) => (
+                  <button
+                    key={sub.value}
+                    type="button"
+                    onClick={() => setCategory(sub.value)}
+                    className={`flex items-center gap-1.5 px-2 py-2 rounded-xl border text-xs font-medium transition-colors ${
+                      category === sub.value ? 'bg-emerald-500 text-white border-emerald-500' : 'bg-slate-50 text-slate-600 border-slate-200'
+                    }`}
+                  >
+                    <span>{sub.emoji}</span>
+                    <span className="truncate">{catLabel(sub.value)}</span>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Quantity + Unit */}

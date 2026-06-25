@@ -8,9 +8,14 @@ const T = {
 
     // Categories
     cat_food: 'Food & Groceries', cat_drinks: 'Drinks & Extras',
-    cat_household: 'Household', cat_personal: 'Personal & Cosmetics',
-    cat_medicine: 'Medicine & First Aid', cat_pets: 'Pets & Animals',
+    cat_household: 'Household', cat_personal: 'Care & Beauty',
+    cat_medicine: 'Medicine', cat_pets: 'Pets',
     cat_other: 'Everything Else',
+    cat_food_veg: 'Veg & Fruit', cat_food_dairy: 'Dairy & Eggs',
+    cat_food_meat: 'Meat & Fish', cat_food_dry: 'Dry & Canned',
+    cat_food_frozen: 'Frozen', cat_food_bread: 'Bread & Bakery',
+    cat_food_snacks: 'Snacks & Sweets', cat_food_drinks: 'Drinks',
+    cat_food_other: 'Other Food',
 
     // Meal slots
     slot_breakfast: 'Breakfast', slot_lunch: 'Lunch', slot_dinner: 'Dinner',
@@ -226,9 +231,14 @@ const T = {
     tab_recipes: 'Retseptid', tab_expenses: 'Kulud',
 
     cat_food: 'Toit ja toidukaubad', cat_drinks: 'Joogid ja lisad',
-    cat_household: 'Kodutarbed', cat_personal: 'Isiklik ja kosmeetika',
-    cat_medicine: 'Ravimid ja esmaabi', cat_pets: 'Loomad',
+    cat_household: 'Kodutarbed', cat_personal: 'Ilu ja hooldus',
+    cat_medicine: 'Ravimid', cat_pets: 'Lemmikloomad',
     cat_other: 'Muu',
+    cat_food_veg: 'Köögi- ja puuviljad', cat_food_dairy: 'Piimatooted ja munad',
+    cat_food_meat: 'Liha ja kala', cat_food_dry: 'Kuivained ja konservid',
+    cat_food_frozen: 'Külmutatud', cat_food_bread: 'Leib ja pagaritooted',
+    cat_food_snacks: 'Snäkid ja maiustused', cat_food_drinks: 'Joogid',
+    cat_food_other: 'Muu toit',
 
     slot_breakfast: 'Hommikusöök', slot_lunch: 'Lõunasöök', slot_dinner: 'Õhtusöök',
 
@@ -427,9 +437,14 @@ const T = {
     tab_recipes: 'Рецепты', tab_expenses: 'Расходы',
 
     cat_food: 'Продукты питания', cat_drinks: 'Напитки и прочее',
-    cat_household: 'Хозтовары', cat_personal: 'Личное и косметика',
-    cat_medicine: 'Лекарства и аптечка', cat_pets: 'Животные',
+    cat_household: 'Хозтовары', cat_personal: 'Красота и уход',
+    cat_medicine: 'Лекарства', cat_pets: 'Животные',
     cat_other: 'Всё остальное',
+    cat_food_veg: 'Овощи и фрукты', cat_food_dairy: 'Молочное и яйца',
+    cat_food_meat: 'Мясо и рыба', cat_food_dry: 'Сухие и консервы',
+    cat_food_frozen: 'Заморозка', cat_food_bread: 'Хлеб и выпечка',
+    cat_food_snacks: 'Снеки и сладкое', cat_food_drinks: 'Напитки',
+    cat_food_other: 'Остальное еда',
 
     slot_breakfast: 'Завтрак', slot_lunch: 'Обед', slot_dinner: 'Ужин',
 
@@ -642,6 +657,9 @@ export function useCatLabel() {
     const map: Record<string, Keys> = {
       food: 'cat_food', drinks: 'cat_drinks', household: 'cat_household',
       personal: 'cat_personal', medicine: 'cat_medicine', pets: 'cat_pets', other: 'cat_other',
+      food_veg: 'cat_food_veg', food_dairy: 'cat_food_dairy', food_meat: 'cat_food_meat',
+      food_dry: 'cat_food_dry', food_frozen: 'cat_food_frozen', food_bread: 'cat_food_bread',
+      food_snacks: 'cat_food_snacks', food_drinks: 'cat_food_drinks', food_other: 'cat_food_other',
     }
     return map[value] ? t(map[value]) : value
   }

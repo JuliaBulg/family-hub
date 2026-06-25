@@ -6,7 +6,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import AddPantryItemModal from '@/components/AddPantryItemModal'
 import ImportReceiptModal from '@/components/ImportReceiptModal'
 import CookTonightModal from '@/components/CookTonightModal'
-import { type Category, CATEGORIES } from '@/lib/categories'
+import { type Category, PANTRY_TOP_CATS, FOOD_SUBCATEGORIES, isFoodFamily, foodSubcatOf } from '@/lib/categories'
 import { useT, useCatLabel } from '@/lib/i18n'
 
 interface PantryItem {
@@ -151,6 +151,18 @@ export default function PantryPage() {
     setItems(prev => prev.filter(i => !ids.includes(i.id)))
   }
 
+  async function adjustQty(item: PantryItem, delta: number) {
+    const current = parseFloat(item.quantity ?? '0') || 0
+    const next = Math.max(0, current + delta)
+    if (next === 0) {
+      await supabase.from('pantry_items').delete().eq('id', item.id)
+      setItems(prev => prev.filter(i => i.id !== item.id))
+    } else {
+      await supabase.from('pantry_items').update({ quantity: String(next) }).eq('id', item.id)
+      setItems(prev => prev.map(i => i.id === item.id ? { ...i, quantity: String(next) } : i))
+    }
+  }
+
   async function discardExpiredGroup(group: PantryItem[]) {
     const ids = group.map(i => i.id)
     await supabase.from('pantry_items').delete().in('id', ids)
@@ -184,6 +196,56 @@ export default function PantryPage() {
   const searchResults  = searchTerm
     ? groupByName(items.filter(i => i.name.toLowerCase().includes(searchTerm)))
     : []
+
+  function renderItemCard(group: PantryItem[]) {
+    const anyExpired  = group.some(i => isExpired(i.expiry_date))
+    const anySoon     = group.some(i => isExpiringSoon(i.expiry_date))
+    const onList      = group.some(i => shoppingNames.has(i.name.toLowerCase()))
+    const wasOnList   = !onList && group.some(i => i.shopping_alert_dismissed)
+    const reservation = group.map(i => reservations.get(i.id)).find(Boolean)
+    const qty         = groupQuantity(group)
+    const ids         = group.map(i => i.id)
+    const days        = daysRemaining(group[0])
+    const consumptionLow = days !== null && days <= 7
+    const hasNumQty   = group[0].quantity != null && !isNaN(parseFloat(group[0].quantity))
+    return (
+      <div
+        key={group[0].id}
+        className={`flex items-center gap-2 px-3 py-2.5 bg-white border rounded-xl ${
+          anyExpired ? 'border-red-200' : anySoon || consumptionLow ? 'border-amber-200' : reservation ? 'border-violet-200' : 'border-slate-100'
+        }`}
+      >
+        <div className="flex-1 min-w-0">
+          <p className="font-medium text-slate-700 text-sm truncate">{group[0].name}</p>
+          <p className="text-xs text-slate-400">
+            {qty}
+            {anyExpired && <span className="text-red-500"> · 🚨 {t('pantry_expired_badge')}</span>}
+            {!anyExpired && anySoon && (
+              <span className="text-amber-500">
+                {' · ⏰ '}{t('pantry_expiring_section')}
+                {onList    && ` · 🛒 ${t('pantry_on_shopping')}`}
+                {wasOnList && ` · ${t('pantry_was_on_list')}`}
+              </span>
+            )}
+            {days !== null && !anyExpired && !anySoon && (
+              <span className={days <= 0 ? 'text-red-500' : days <= 7 ? 'text-amber-500' : 'text-slate-400'}>
+                {' · '}{days <= 0 ? '⏳ running low' : `~${days}d left`}
+              </span>
+            )}
+            {reservation && <span className="text-violet-500"> · 📅 {reservation.mealName}</span>}
+          </p>
+        </div>
+        {hasNumQty && (
+          <button
+            onClick={() => void adjustQty(group[0], -1)}
+            className="w-6 h-6 flex items-center justify-center rounded-full bg-slate-100 hover:bg-red-100 text-slate-500 hover:text-red-500 text-sm font-bold transition-colors flex-shrink-0"
+          >−</button>
+        )}
+        <button onClick={() => setEditItem(group[0])} className="text-slate-300 hover:text-slate-500 text-sm transition-colors px-0.5 flex-shrink-0">✏️</button>
+        <button onClick={() => void deleteGroup(ids)} className="text-slate-300 hover:text-red-400 text-base transition-colors flex-shrink-0">✕</button>
+      </div>
+    )
+  }
 
   return (
     <div className="px-4 pt-3">
@@ -229,7 +291,9 @@ export default function PantryPage() {
                 {searchResults.length} result{searchResults.length !== 1 ? 's' : ''}
               </p>
               {searchResults.map(group => {
-                const cat         = CATEGORIES.find(c => c.value === group[0].category)
+                const rawCat      = group[0].category
+                const catMeta     = isFoodFamily(rawCat) ? foodSubcatOf(rawCat) : PANTRY_TOP_CATS.find(c => c.value === rawCat)
+                const cat         = catMeta
                 const anyExpired  = group.some(i => isExpired(i.expiry_date))
                 const anySoon     = group.some(i => isExpiringSoon(i.expiry_date))
                 const onList      = group.some(i => shoppingNames.has(i.name.toLowerCase()))
@@ -356,13 +420,6 @@ export default function PantryPage() {
             </div>
           )}
 
-          {expired.length === 0 && expiringSoon.length === 0 && (
-            <div className="mb-2 px-3 py-2 bg-amber-50 border border-amber-200 rounded-xl flex gap-2 items-center">
-              <span className="text-lg">⏰</span>
-              <p className="text-amber-800 text-xs font-semibold">No expiry alerts</p>
-            </div>
-          )}
-
           {/* Cook tonight button */}
           <button
             onClick={() => setShowCookModal(true)}
@@ -373,13 +430,54 @@ export default function PantryPage() {
 
           {/* Category cards */}
           <div className="space-y-2 mb-3">
-            <h2 className="text-xs font-semibold text-slate-500 uppercase tracking-wide">{t('tab_pantry')}</h2>
 
-            {CATEGORIES.map((cat) => {
-              const catItems = items.filter((i) => i.category === cat.value)
-              const isOpen   = expandedCategory === cat.value
-              const groups   = groupByName(catItems)
+            {/* Food umbrella card */}
+            {(() => {
+              const foodItems = items.filter(i => isFoodFamily(i.category))
+              if (foodItems.length === 0) return null
+              const isOpen = expandedCategory === 'food'
+              return (
+                <div key="food">
+                  <button
+                    onClick={() => setExpandedCategory(isOpen ? null : 'food')}
+                    className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border bg-green-50 border-green-200 cursor-pointer active:scale-[0.98] transition-transform"
+                  >
+                    <span className="text-xl">🛒</span>
+                    <div className="flex-1 text-left">
+                      <p className="font-semibold text-slate-800 text-sm">{catLabel('food')}</p>
+                      <p className="text-xs text-slate-500">{groupByName(foodItems).length} item{groupByName(foodItems).length !== 1 ? 's' : ''}</p>
+                    </div>
+                    <span className={`text-slate-400 text-lg transition-transform ${isOpen ? 'rotate-90' : ''}`}>›</span>
+                  </button>
 
+                  {isOpen && (
+                    <div className="mt-1 ml-2 space-y-3">
+                      {FOOD_SUBCATEGORIES.map(sub => {
+                        const subItems = foodItems.filter(i => foodSubcatOf(i.category).value === sub.value)
+                        if (subItems.length === 0) return null
+                        return (
+                          <div key={sub.value}>
+                            <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide px-1 mb-1">
+                              {sub.emoji} {catLabel(sub.value)}
+                            </p>
+                            <div className="space-y-1">
+                              {groupByName(subItems).map(group => renderItemCard(group))}
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
+              )
+            })()}
+
+            {/* Non-food top-level categories */}
+            {PANTRY_TOP_CATS.filter(c => c.value !== 'food').map(cat => {
+              const catItems = items.filter(i => i.category === cat.value)
+              if (catItems.length === 0) return null
+              const isOpen = expandedCategory === cat.value
+              const groups = groupByName(catItems)
               return (
                 <div key={cat.value}>
                   <button
@@ -389,76 +487,13 @@ export default function PantryPage() {
                     <span className="text-xl">{cat.emoji}</span>
                     <div className="flex-1 text-left">
                       <p className="font-semibold text-slate-800 text-sm">{catLabel(cat.value)}</p>
-                      <p className="text-xs text-slate-500">
-                        {groups.length === 0 ? t('pantry_nothing_yet') : `${groups.length} item${groups.length > 1 ? 's' : ''}`}
-                      </p>
+                      <p className="text-xs text-slate-500">{groups.length} item{groups.length !== 1 ? 's' : ''}</p>
                     </div>
                     <span className={`text-slate-400 text-lg transition-transform ${isOpen ? 'rotate-90' : ''}`}>›</span>
                   </button>
-
-                  {isOpen && groups.length > 0 && (
+                  {isOpen && (
                     <div className="mt-1 ml-2 space-y-1">
-                      {groups.map((group) => {
-                        const anyExpired  = group.some(i => isExpired(i.expiry_date))
-                        const anySoon     = group.some(i => isExpiringSoon(i.expiry_date))
-                        const onList      = group.some(i => shoppingNames.has(i.name.toLowerCase()))
-                        const wasOnList   = !onList && group.some(i => i.shopping_alert_dismissed)
-                        const reservation = group.map(i => reservations.get(i.id)).find(Boolean)
-                        const qty         = groupQuantity(group)
-                        const ids         = group.map(i => i.id)
-                        const days = daysRemaining(group[0])
-                        const consumptionLow = days !== null && days <= 7
-                        return (
-                          <div
-                            key={group[0].id}
-                            className={`flex items-center gap-3 px-4 py-3 bg-white border rounded-xl ${
-                              anyExpired ? 'border-red-200' : anySoon || consumptionLow ? 'border-amber-200' : reservation ? 'border-violet-200' : 'border-slate-100'
-                            }`}
-                          >
-                            <div className="flex-1">
-                              <p className="font-medium text-slate-700">{group[0].name}</p>
-                              <p className="text-xs text-slate-400">
-                                {qty}
-                                {anyExpired && <span className="text-red-500"> · 🚨 {t('pantry_expired_badge')}</span>}
-                                {!anyExpired && anySoon && (
-                                  <span className="text-amber-500">
-                                    {' · ⏰ '}{t('pantry_expiring_section')}
-                                    {onList    && ` · 🛒 ${t('pantry_on_shopping')}`}
-                                    {wasOnList && ` · ${t('pantry_was_on_list')}`}
-                                  </span>
-                                )}
-                                {days !== null && !anyExpired && !anySoon && (
-                                  <span className={days <= 0 ? 'text-red-500' : days <= 7 ? 'text-amber-500' : 'text-slate-400'}>
-                                    {' · '}{days <= 0 ? '⏳ running low' : `~${days}d left`}
-                                  </span>
-                                )}
-                                {reservation && (
-                                  <span className="text-violet-500"> · 📅 {reservation.mealName}</span>
-                                )}
-                              </p>
-                            </div>
-                            <button
-                              onClick={() => setEditItem(group[0])}
-                              className="text-slate-300 hover:text-slate-500 text-base transition-colors px-1"
-                              title="Edit"
-                            >
-                              ✏️
-                            </button>
-                            <button
-                              onClick={() => deleteGroup(ids)}
-                              className="text-slate-300 hover:text-red-400 text-lg transition-colors"
-                            >
-                              ✕
-                            </button>
-                          </div>
-                        )
-                      })}
-                    </div>
-                  )}
-
-                  {isOpen && groups.length === 0 && (
-                    <div className="mt-1 ml-2 px-4 py-3 text-slate-400 text-sm italic">
-                      {t('pantry_cat_empty')}
+                      {groups.map(group => renderItemCard(group))}
                     </div>
                   )}
                 </div>

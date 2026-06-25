@@ -3,7 +3,7 @@
 import { useState, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
-import { CATEGORIES, type Category } from '@/lib/categories'
+import { CATEGORIES, FOOD_SUBCATEGORIES, type Category, isFoodFamily } from '@/lib/categories'
 import { useCatLabel, useT } from '@/lib/i18n'
 
 type Step = 'input' | 'parsing' | 'review' | 'expense'
@@ -80,10 +80,13 @@ export default function ImportReceiptModal({ onClose, onAdded }: Props) {
       if (!res.ok) { const j = await res.json(); throw new Error(j.error ?? 'Server error') }
 
       const json = await res.json()
-      const validValues = new Set(CATEGORIES.map(c => c.value))
+      const validValues = new Set([
+        ...CATEGORIES.map(c => c.value),
+        ...FOOD_SUBCATEGORIES.map(s => s.value),
+      ])
       const items: ParsedItem[] = (json.items ?? []).map((i: ParsedItem) => ({
         name: i.name,
-        category: validValues.has(i.category) ? i.category : ('food' as Category),
+        category: validValues.has(i.category) ? i.category : ('food_other' as Category),
         quantity: i.quantity ?? null,
         unit: i.unit ?? null,
         price: typeof i.price === 'number' ? i.price : null,
@@ -162,14 +165,17 @@ export default function ImportReceiptModal({ onClose, onAdded }: Props) {
     setSaving(false)
     if (insertError) { setError(t('receipt_error_save')); return }
 
+    // Roll food sub-categories up to 'food' for expense grouping
+    const expBucket = (cat: Category): Category => isFoodFamily(cat) ? 'food' : cat
     const totals: Partial<Record<Category, number>> = {}
     toAdd.forEach(item => {
       if (item.price != null) {
-        totals[item.category] = (totals[item.category] ?? 0) + item.price
+        const bucket = expBucket(item.category)
+        totals[bucket] = (totals[bucket] ?? 0) + item.price
       }
     })
 
-    const cats = [...new Set(toAdd.map(i => i.category))] as Category[]
+    const cats = [...new Set(toAdd.map(i => expBucket(i.category)))] as Category[]
     setExpCategories(cats)
     setExpAmounts(
       Object.fromEntries(
@@ -329,7 +335,14 @@ export default function ImportReceiptModal({ onClose, onAdded }: Props) {
                           <p className="text-xs text-slate-400 mt-0.5">{item.quantity}{item.unit ? ` ${item.unit}` : ''}</p>
                         )}
                         <div className="flex gap-1 mt-1.5 flex-wrap">
-                          {CATEGORIES.map(c => (
+                          {FOOD_SUBCATEGORIES.map(c => (
+                            <button key={c.value} onClick={() => updateCategory(idx, c.value)}
+                              className={`px-2 py-0.5 rounded-full text-xs font-medium transition-colors ${item.category === c.value ? 'bg-emerald-500 text-white' : 'bg-slate-100 text-slate-500'}`}
+                            >
+                              {c.emoji} {catLabel(c.value)}
+                            </button>
+                          ))}
+                          {CATEGORIES.filter(c => !['food','drinks','other'].includes(c.value)).map(c => (
                             <button key={c.value} onClick={() => updateCategory(idx, c.value)}
                               className={`px-2 py-0.5 rounded-full text-xs font-medium transition-colors ${item.category === c.value ? 'bg-emerald-500 text-white' : 'bg-slate-100 text-slate-500'}`}
                             >
@@ -353,7 +366,7 @@ export default function ImportReceiptModal({ onClose, onAdded }: Props) {
               <p className="text-xs text-slate-400">{t('receipt_expense_hint')}</p>
 
               {expCategories.map(catValue => {
-                const cat = CATEGORIES.find(c => c.value === catValue)!
+                const cat = CATEGORIES.find(c => c.value === catValue) ?? CATEGORIES[0]!
                 return (
                   <div key={catValue} className="flex items-center gap-3">
                     <span className="text-xl flex-shrink-0">{cat.emoji}</span>

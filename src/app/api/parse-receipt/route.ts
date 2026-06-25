@@ -17,7 +17,9 @@ SKIP (do not output as items) any line that is:
 
 For each item return:
 - name: clean product name (no prices, quantities in the name, or item codes)
-- category: exactly one of "food", "household", "drinks", "personal", "medicine", "pets", "other"
+- category: exactly one of these values:
+    Food sub-categories: "food_veg" (vegetables, fruit), "food_dairy" (milk, cheese, eggs, yogurt, butter), "food_meat" (meat, poultry, fish, seafood, deli), "food_dry" (pasta, rice, flour, oil, canned goods, sauces, condiments), "food_frozen" (ice cream, frozen pizza, frozen veg), "food_bread" (bread, rolls, pastry, bakery), "food_snacks" (chips, chocolate, sweets, nuts, candy, biscuits, wafers), "food_drinks" (juice, water, beer, wine, soft drinks, coffee, tea), "food_other" (any other food item that doesn't fit above)
+    Other: "household" (cleaning, paper, kitchen supplies), "personal" (shampoo, cosmetics, hygiene, beauty), "medicine" (pharmacy, supplements), "pets" (pet food, pet supplies)
 - quantity: if a "X,000 tk." multiplier line is present → that integer count as a string (e.g. "4"); otherwise the numeric amount from the product name as a string; otherwise null
 - unit: if a "X,000 tk." multiplier line is present → "pcs"; otherwise unit like "g", "kg", "L", "ml", "pcs", "bottle", "pack" — or null
 - price: the total line price for this item as a number (not unit price), or null if not visible
