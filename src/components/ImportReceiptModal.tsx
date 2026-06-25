@@ -150,9 +150,14 @@ export default function ImportReceiptModal({ onClose, onAdded }: Props) {
         }
       }
 
+      // Map food sub-categories to base DB values until schema migration is run
+      const dbCategory = item.category === 'food_drinks' ? 'drinks'
+        : (item.category as string).startsWith('food_') ? 'food'
+        : item.category
+
       const { error } = await supabase.from('pantry_items').insert({
         name: trimmedName,
-        category: item.category,
+        category: dbCategory,
         quantity: item.quantity,
         unit: item.unit,
         expiry_date: expiryDate,
@@ -163,7 +168,7 @@ export default function ImportReceiptModal({ onClose, onAdded }: Props) {
     }
 
     setSaving(false)
-    if (insertError) { setError(t('receipt_error_save')); return }
+    if (insertError) { setError(`${t('receipt_error_save')} (${insertError})`); return }
 
     // Roll food sub-categories up to 'food' for expense grouping
     const expBucket = (cat: Category): Category => isFoodFamily(cat) ? 'food' : cat

@@ -125,9 +125,14 @@ export default function AddPantryItemModal({ onClose, onAdded, editItem }: Props
     setLoading(true)
     setError('')
 
+    // Map food sub-categories to base DB values until schema migration is run
+    const dbCategory: Category = category === 'food_drinks' ? 'drinks'
+      : (category as string).startsWith('food_') ? 'food'
+      : category
+
     const payload = {
       name: name.trim(),
-      category,
+      category: dbCategory,
       quantity: quantity.trim() || null,
       unit: unit.trim() || null,
       expiry_date: expiryDate || null,
