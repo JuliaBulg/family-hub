@@ -39,7 +39,7 @@ function SwipeRow({ children, onTap, onDelete, onAddToShopping }: {
     if (!dragging.current) return
     const dx = e.touches[0].clientX - startX.current
     const dy = e.touches[0].clientY - startY.current
-    if (Math.abs(dy) > Math.abs(dx) + 5) { dragging.current = false; return }
+    if (Math.abs(dy) > Math.abs(dx) + 5) { dragging.current = false; if (Math.abs(dy) > 8) moved.current = true; return }
     if (Math.abs(dx) > 5) moved.current = true
     if (!moved.current) return
     const next = Math.max(-REVEAL, Math.min(0, startOffset.current + dx))
