@@ -182,15 +182,15 @@ export default function AddPantryItemModal({ onClose, onAdded, onDeleted, editIt
 
   return (
     <div
-      className="fixed inset-0 bg-black/40 z-[200] flex items-end justify-center"
+      className="fixed inset-0 bg-black/40 z-[200] flex items-start justify-center"
       onClick={onClose}
     >
       <div
-        className="bg-white w-full max-w-md rounded-t-3xl flex flex-col"
-        style={{ maxHeight: '92dvh' }}
+        className="bg-white w-full max-w-md rounded-b-3xl flex flex-col"
+        style={{ height: '100dvh' }}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex-shrink-0 px-6 pt-5 pb-3 flex items-center justify-between">
+        <div className="flex-shrink-0 px-6 pt-8 pb-3 flex items-center justify-between">
           <h2 className="text-xl font-bold text-slate-800">
             {editItem ? t('pmodal_edit_title') : t('pmodal_add_title')}
           </h2>
