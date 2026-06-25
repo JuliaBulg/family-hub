@@ -79,8 +79,9 @@ function SwipeRow({ children, onTap, onDelete, onAddToShopping }: {
         </button>
       </div>
 
-      {/* Row content */}
+      {/* Row content — must be relative so it stacks above the absolute action buttons */}
       <div
+        className="relative"
         style={offset !== 0
           ? { transform: `translateX(${offset}px)`, transition: moved.current ? 'none' : 'transform 0.22s ease' }
           : undefined}
