@@ -248,7 +248,8 @@ export default function PantryPage() {
   }
 
   return (
-    <div className="relative px-4 pt-3">
+    <div className="flex flex-col h-full">
+    <div className="flex-1 min-h-0 overflow-y-auto px-4 pt-3">
       {/* Header */}
       <div className="mb-3">
         <h1 className="text-xl font-bold text-slate-800">🏠 Home Hub</h1>
@@ -503,51 +504,49 @@ export default function PantryPage() {
         </>
       )}
 
-      {/* Spacer so sticky bar doesn't cover content */}
-      <div className="h-20" />
+    </div>{/* end scrollable content */}
 
-      {showModal && (
-        <AddPantryItemModal
-          onClose={() => setShowModal(false)}
-          onAdded={fetchItems}
-        />
-      )}
+    {/* Action bar — sits directly above BottomNav, no gap */}
+    <div className="flex-shrink-0 px-4 pt-2 pb-3 bg-slate-50 border-t border-slate-100 flex gap-3">
+      <button
+        onClick={() => setShowModal(true)}
+        className="flex-1 py-3 bg-emerald-500 hover:bg-emerald-600 active:bg-emerald-700 text-white font-semibold rounded-xl text-sm transition-colors shadow-sm"
+      >
+        {t('pantry_add_item')}
+      </button>
+      <button
+        onClick={() => setShowImportModal(true)}
+        className="flex-1 py-3 bg-emerald-500 hover:bg-emerald-600 active:bg-emerald-700 text-white font-semibold rounded-xl text-sm transition-colors shadow-sm"
+      >
+        {t('pantry_import_btn')}
+      </button>
+    </div>
 
-      {editItem && (
-        <AddPantryItemModal
-          editItem={editItem}
-          onClose={() => setEditItem(null)}
-          onAdded={() => { fetchItems(); setEditItem(null) }}
-        />
-      )}
+    {showModal && (
+      <AddPantryItemModal
+        onClose={() => setShowModal(false)}
+        onAdded={fetchItems}
+      />
+    )}
 
-      {showImportModal && (
-        <ImportReceiptModal
-          onClose={() => setShowImportModal(false)}
-          onAdded={fetchItems}
-        />
-      )}
+    {editItem && (
+      <AddPantryItemModal
+        editItem={editItem}
+        onClose={() => setEditItem(null)}
+        onAdded={() => { fetchItems(); setEditItem(null) }}
+      />
+    )}
 
-      {showCookModal && (
-        <CookTonightModal items={items} onClose={() => setShowCookModal(false)} />
-      )}
+    {showImportModal && (
+      <ImportReceiptModal
+        onClose={() => setShowImportModal(false)}
+        onAdded={fetchItems}
+      />
+    )}
 
-      {/* Sticky action bar */}
-      <div className="sticky bottom-0 bg-slate-50 pt-2 pb-4 flex gap-3">
-        <button
-          onClick={() => setShowModal(true)}
-          className="flex-1 py-3 bg-emerald-500 hover:bg-emerald-600 active:bg-emerald-700 text-white font-semibold rounded-xl text-sm transition-colors shadow-sm"
-        >
-          {t('pantry_add_item')}
-        </button>
-        <button
-          onClick={() => setShowImportModal(true)}
-          className="flex-1 py-3 bg-emerald-500 hover:bg-emerald-600 active:bg-emerald-700 text-white font-semibold rounded-xl text-sm transition-colors shadow-sm"
-          style={{ backgroundColor: '#10b981', color: '#fff' }}
-        >
-          {t('pantry_import_btn')}
-        </button>
-      </div>
+    {showCookModal && (
+      <CookTonightModal items={items} onClose={() => setShowCookModal(false)} />
+    )}
     </div>
   )
 }
