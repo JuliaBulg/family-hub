@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import React, { useEffect, useState, useCallback, useRef, type ReactNode } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
 import AddPantryItemModal from '@/components/AddPantryItemModal'
@@ -8,6 +8,96 @@ import ImportReceiptModal from '@/components/ImportReceiptModal'
 import CookTonightModal from '@/components/CookTonightModal'
 import { type Category, PANTRY_TOP_CATS, FOOD_SUBCATEGORIES, isFoodFamily, foodSubcatOf } from '@/lib/categories'
 import { useT, useCatLabel } from '@/lib/i18n'
+import { addToShoppingMerged } from '@/lib/shopping'
+
+function SwipeRow({ children, onTap, onDelete, onAddToShopping }: {
+  children: ReactNode
+  onTap: () => void
+  onDelete: () => void
+  onAddToShopping: () => void
+}) {
+  const REVEAL = 112
+  const [offset, setOffset]  = useState(0)
+  const curOffset  = useRef(0)
+  const startOffset = useRef(0)
+  const startX     = useRef(0)
+  const startY     = useRef(0)
+  const moved      = useRef(false)
+  const dragging   = useRef(false)
+  const didTouch   = useRef(false)
+
+  function onTouchStart(e: React.TouchEvent<HTMLDivElement>) {
+    startX.current      = e.touches[0].clientX
+    startY.current      = e.touches[0].clientY
+    moved.current       = false
+    dragging.current    = true
+    didTouch.current    = true
+    startOffset.current = curOffset.current
+  }
+
+  function onTouchMove(e: React.TouchEvent<HTMLDivElement>) {
+    if (!dragging.current) return
+    const dx = e.touches[0].clientX - startX.current
+    const dy = e.touches[0].clientY - startY.current
+    if (Math.abs(dy) > Math.abs(dx) + 5) { dragging.current = false; return }
+    if (Math.abs(dx) > 5) moved.current = true
+    if (!moved.current) return
+    const next = Math.max(-REVEAL, Math.min(0, startOffset.current + dx))
+    curOffset.current = next
+    setOffset(next)
+  }
+
+  function onTouchEnd() {
+    dragging.current = false
+    if (!moved.current) {
+      if (curOffset.current < 0) { curOffset.current = 0; setOffset(0); return }
+      onTap()
+      return
+    }
+    const snap = curOffset.current < -REVEAL / 2 ? -REVEAL : 0
+    curOffset.current = snap
+    setOffset(snap)
+  }
+
+  return (
+    <div className="relative overflow-hidden rounded-xl">
+      {/* Actions revealed on swipe left */}
+      <div className="absolute inset-y-0 right-0 flex rounded-r-xl overflow-hidden" style={{ width: REVEAL }}>
+        <button
+          className="flex-1 bg-emerald-500 active:bg-emerald-600 flex flex-col items-center justify-center gap-0.5 text-white"
+          onClick={(e) => { e.stopPropagation(); curOffset.current = 0; setOffset(0); onAddToShopping() }}
+        >
+          <span className="text-xl">🛒</span>
+          <span className="text-[9px] font-semibold tracking-wide">Shop</span>
+        </button>
+        <button
+          className="flex-1 bg-red-500 active:bg-red-600 flex flex-col items-center justify-center gap-0.5 text-white"
+          onClick={(e) => { e.stopPropagation(); curOffset.current = 0; setOffset(0); onDelete() }}
+        >
+          <span className="text-xl">🗑️</span>
+          <span className="text-[9px] font-semibold tracking-wide">Delete</span>
+        </button>
+      </div>
+
+      {/* Row content */}
+      <div
+        style={offset !== 0
+          ? { transform: `translateX(${offset}px)`, transition: moved.current ? 'none' : 'transform 0.22s ease' }
+          : undefined}
+        onTouchStart={onTouchStart}
+        onTouchMove={onTouchMove}
+        onTouchEnd={onTouchEnd}
+        onClick={() => {
+          if (didTouch.current) { didTouch.current = false; return }
+          if (curOffset.current < 0) { curOffset.current = 0; setOffset(0); return }
+          onTap()
+        }}
+      >
+        {children}
+      </div>
+    </div>
+  )
+}
 
 interface PantryItem {
   id: string
@@ -208,42 +298,50 @@ export default function PantryPage() {
     const days        = daysRemaining(group[0])
     const consumptionLow = days !== null && days <= 7
     const hasNumQty   = group[0].quantity != null && !isNaN(parseFloat(group[0].quantity))
+    const borderColor = anyExpired ? 'border-red-200' : anySoon || consumptionLow ? 'border-amber-200' : reservation ? 'border-violet-200' : 'border-slate-100'
     return (
-      <div
+      <SwipeRow
         key={group[0].id}
-        className={`flex items-center gap-2 px-3 py-2.5 bg-white border rounded-xl ${
-          anyExpired ? 'border-red-200' : anySoon || consumptionLow ? 'border-amber-200' : reservation ? 'border-violet-200' : 'border-slate-100'
-        }`}
+        onTap={() => setEditItem(group[0])}
+        onDelete={() => void deleteGroup(ids)}
+        onAddToShopping={() => {
+          if (!profile?.household_id) return
+          void addToShoppingMerged(
+            [{ name: group[0].name, amount_per_pack: group[0].quantity ? parseFloat(group[0].quantity) || null : null, unit: group[0].unit ?? null }],
+            profile.household_id,
+            profile.display_name ?? null,
+          )
+        }}
       >
-        <div className="flex-1 min-w-0">
-          <p className="font-medium text-slate-700 text-sm truncate">{group[0].name}</p>
-          <p className="text-xs text-slate-400">
-            {qty}
-            {anyExpired && <span className="text-red-500"> · 🚨 {t('pantry_expired_badge')}</span>}
-            {!anyExpired && anySoon && (
-              <span className="text-amber-500">
-                {' · ⏰ '}{t('pantry_expiring_section')}
-                {onList    && ` · 🛒 ${t('pantry_on_shopping')}`}
-                {wasOnList && ` · ${t('pantry_was_on_list')}`}
-              </span>
-            )}
-            {days !== null && !anyExpired && !anySoon && (
-              <span className={days <= 0 ? 'text-red-500' : days <= 7 ? 'text-amber-500' : 'text-slate-400'}>
-                {' · '}{days <= 0 ? '⏳ running low' : `~${days}d left`}
-              </span>
-            )}
-            {reservation && <span className="text-violet-500"> · 📅 {reservation.mealName}</span>}
-          </p>
+        <div className={`flex items-center gap-2 px-3 py-2.5 bg-white border ${borderColor} rounded-xl cursor-pointer`}>
+          <div className="flex-1 min-w-0">
+            <p className="font-medium text-slate-700 text-sm truncate">{group[0].name}</p>
+            <p className="text-xs text-slate-400">
+              {qty}
+              {anyExpired && <span className="text-red-500"> · 🚨 {t('pantry_expired_badge')}</span>}
+              {!anyExpired && anySoon && (
+                <span className="text-amber-500">
+                  {' · ⏰ '}{t('pantry_expiring_section')}
+                  {onList    && ` · 🛒 ${t('pantry_on_shopping')}`}
+                  {wasOnList && ` · ${t('pantry_was_on_list')}`}
+                </span>
+              )}
+              {days !== null && !anyExpired && !anySoon && (
+                <span className={days <= 0 ? 'text-red-500' : days <= 7 ? 'text-amber-500' : 'text-slate-400'}>
+                  {' · '}{days <= 0 ? '⏳ running low' : `~${days}d left`}
+                </span>
+              )}
+              {reservation && <span className="text-violet-500"> · 📅 {reservation.mealName}</span>}
+            </p>
+          </div>
+          {hasNumQty && (
+            <button
+              onClick={(e) => { e.stopPropagation(); void adjustQty(group[0], -1) }}
+              className="w-6 h-6 flex items-center justify-center rounded-full bg-slate-100 hover:bg-red-100 text-slate-500 hover:text-red-500 text-sm font-bold transition-colors flex-shrink-0"
+            >−</button>
+          )}
         </div>
-        {hasNumQty && (
-          <button
-            onClick={() => void adjustQty(group[0], -1)}
-            className="w-6 h-6 flex items-center justify-center rounded-full bg-slate-100 hover:bg-red-100 text-slate-500 hover:text-red-500 text-sm font-bold transition-colors flex-shrink-0"
-          >−</button>
-        )}
-        <button onClick={() => setEditItem(group[0])} className="text-slate-300 hover:text-slate-500 text-sm transition-colors px-0.5 flex-shrink-0">✏️</button>
-        <button onClick={() => void deleteGroup(ids)} className="text-slate-300 hover:text-red-400 text-base transition-colors flex-shrink-0">✕</button>
-      </div>
+      </SwipeRow>
     )
   }
 
@@ -294,7 +392,6 @@ export default function PantryPage() {
               {searchResults.map(group => {
                 const rawCat      = group[0].category
                 const catMeta     = isFoodFamily(rawCat) ? foodSubcatOf(rawCat) : PANTRY_TOP_CATS.find(c => c.value === rawCat)
-                const cat         = catMeta
                 const anyExpired  = group.some(i => isExpired(i.expiry_date))
                 const anySoon     = group.some(i => isExpiringSoon(i.expiry_date))
                 const onList      = group.some(i => shoppingNames.has(i.name.toLowerCase()))
@@ -304,39 +401,45 @@ export default function PantryPage() {
                 const ids         = group.map(i => i.id)
                 const days        = daysRemaining(group[0])
                 const consumptionLow = days !== null && days <= 7
+                const borderColor = anyExpired ? 'border-red-200' : anySoon || consumptionLow ? 'border-amber-200' : reservation ? 'border-violet-200' : 'border-slate-100'
                 return (
-                  <div
+                  <SwipeRow
                     key={group[0].id}
-                    className={`flex items-center gap-3 px-4 py-3 bg-white border rounded-xl ${
-                      anyExpired ? 'border-red-200' : anySoon || consumptionLow ? 'border-amber-200' : reservation ? 'border-violet-200' : 'border-slate-100'
-                    }`}
+                    onTap={() => setEditItem(group[0])}
+                    onDelete={() => void deleteGroup(ids)}
+                    onAddToShopping={() => {
+                      if (!profile?.household_id) return
+                      void addToShoppingMerged(
+                        [{ name: group[0].name, amount_per_pack: group[0].quantity ? parseFloat(group[0].quantity) || null : null, unit: group[0].unit ?? null }],
+                        profile.household_id,
+                        profile.display_name ?? null,
+                      )
+                    }}
                   >
-                    <span className="text-lg flex-shrink-0">{cat?.emoji}</span>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium text-slate-700">{group[0].name}</p>
-                      <p className="text-xs text-slate-400">
-                        {qty}
-                        {anyExpired && <span className="text-red-500"> · 🚨 {t('pantry_expired_badge')}</span>}
-                        {!anyExpired && anySoon && (
-                          <span className="text-amber-500">
-                            {' · ⏰ '}{t('pantry_expiring_section')}
-                            {onList    && ` · 🛒 ${t('pantry_on_shopping')}`}
-                            {wasOnList && ` · ${t('pantry_was_on_list')}`}
-                          </span>
-                        )}
-                        {days !== null && !anyExpired && !anySoon && (
-                          <span className={days <= 0 ? 'text-red-500' : days <= 7 ? 'text-amber-500' : 'text-slate-400'}>
-                            {' · '}{days <= 0 ? '⏳ running low' : `~${days}d left`}
-                          </span>
-                        )}
-                        {reservation && (
-                          <span className="text-violet-500"> · 📅 {reservation.mealName}</span>
-                        )}
-                      </p>
+                    <div className={`flex items-center gap-3 px-4 py-3 bg-white border ${borderColor} rounded-xl cursor-pointer`}>
+                      <span className="text-lg flex-shrink-0">{catMeta?.emoji}</span>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-slate-700">{group[0].name}</p>
+                        <p className="text-xs text-slate-400">
+                          {qty}
+                          {anyExpired && <span className="text-red-500"> · 🚨 {t('pantry_expired_badge')}</span>}
+                          {!anyExpired && anySoon && (
+                            <span className="text-amber-500">
+                              {' · ⏰ '}{t('pantry_expiring_section')}
+                              {onList    && ` · 🛒 ${t('pantry_on_shopping')}`}
+                              {wasOnList && ` · ${t('pantry_was_on_list')}`}
+                            </span>
+                          )}
+                          {days !== null && !anyExpired && !anySoon && (
+                            <span className={days <= 0 ? 'text-red-500' : days <= 7 ? 'text-amber-500' : 'text-slate-400'}>
+                              {' · '}{days <= 0 ? '⏳ running low' : `~${days}d left`}
+                            </span>
+                          )}
+                          {reservation && <span className="text-violet-500"> · 📅 {reservation.mealName}</span>}
+                        </p>
+                      </div>
                     </div>
-                    <button onClick={() => setEditItem(group[0])} className="text-slate-300 hover:text-slate-500 text-base transition-colors px-1">✏️</button>
-                    <button onClick={() => deleteGroup(ids)} className="text-slate-300 hover:text-red-400 text-lg transition-colors">✕</button>
-                  </div>
+                  </SwipeRow>
                 )
               })}
             </>
@@ -534,6 +637,7 @@ export default function PantryPage() {
         editItem={editItem}
         onClose={() => setEditItem(null)}
         onAdded={() => { fetchItems(); setEditItem(null) }}
+        onDeleted={() => { fetchItems(); setEditItem(null) }}
       />
     )}
 

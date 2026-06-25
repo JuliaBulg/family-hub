@@ -52,10 +52,11 @@ interface EditItem {
 interface Props {
   onClose: () => void
   onAdded: () => void
+  onDeleted?: () => void
   editItem?: EditItem
 }
 
-export default function AddPantryItemModal({ onClose, onAdded, editItem }: Props) {
+export default function AddPantryItemModal({ onClose, onAdded, onDeleted, editItem }: Props) {
   const { profile } = useAuth()
   const t = useT()
   const catLabel = useCatLabel()
@@ -118,6 +119,15 @@ export default function AddPantryItemModal({ onClose, onAdded, editItem }: Props
     setSendingToShop(false)
     setSentToShop(true)
     setTimeout(() => setSentToShop(false), 2000)
+  }
+
+  async function handleDelete() {
+    if (!editItem) return
+    setLoading(true)
+    await supabase.from('pantry_items').delete().eq('id', editItem.id)
+    setLoading(false)
+    onDeleted?.()
+    onClose()
   }
 
   async function handleSubmit() {
@@ -381,6 +391,17 @@ export default function AddPantryItemModal({ onClose, onAdded, editItem }: Props
           >
             {loading ? t('saving') : editItem ? t('pmodal_update_btn') : t('pmodal_save_btn')}
           </button>
+
+          {editItem && onDeleted && (
+            <button
+              type="button"
+              onClick={() => void handleDelete()}
+              disabled={loading}
+              className="w-full py-3 border border-red-200 bg-red-50 text-red-600 font-semibold rounded-2xl text-sm hover:bg-red-100 active:bg-red-200 disabled:opacity-60 transition-colors"
+            >
+              🗑️ {t('pmodal_delete_btn')}
+            </button>
+          )}
         </div>
 
       </div>

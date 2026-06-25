@@ -194,6 +194,7 @@ const T = {
     pmodal_suggest_apply: 'Apply',
     pmodal_send_to_shop: 'Add to shopping list',
     pmodal_sent_to_shop: '✓ Added',
+    pmodal_delete_btn: 'Delete item',
 
     // Shopping modal
     smodal_title: 'Add to Shopping List', smodal_edit_title: 'Edit Item',
@@ -402,6 +403,7 @@ const T = {
     pmodal_suggest_apply: 'Rakenda',
     pmodal_send_to_shop: 'Lisa ostunimekirja',
     pmodal_sent_to_shop: '✓ Lisatud',
+    pmodal_delete_btn: 'Kustuta toode',
 
     smodal_title: 'Lisa ostulistile', smodal_edit_title: 'Muuda toodet',
     smodal_name: 'Toote nimi', smodal_pcs: 'Tk / pakki', smodal_amount: 'Kogus', smodal_unit: 'Ühik',
@@ -608,6 +610,7 @@ const T = {
     pmodal_suggest_apply: 'Применить',
     pmodal_send_to_shop: 'Добавить в список покупок',
     pmodal_sent_to_shop: '✓ Добавлено',
+    pmodal_delete_btn: 'Удалить товар',
 
     smodal_title: 'Добавить в список покупок', smodal_edit_title: 'Изменить товар',
     smodal_name: 'Название товара', smodal_pcs: 'Шт / упак.', smodal_amount: 'Количество', smodal_unit: 'Единица',
