@@ -1,23 +1,25 @@
 # Family Hub — Next Session Starting Point
 
-**Written:** 16-Jun-2026
-**Session status:** Session 12 complete. Live at https://family-hub-seven-sigma.vercel.app
+**Written:** 25-Jun-2026
+**Session status:** Session 13 complete. Live at https://family-hub-seven-sigma.vercel.app
 
 ---
 
-## What was built / fixed in session 12
+## What was built / fixed in session 13
 
 | What | Where | Notes |
 |------|-------|-------|
-| Structured quantities on shopping items | `shopping_items` table + `AddShoppingItemModal` + `shopping/page.tsx` | New columns: `pcs`, `amount_per_pack`, `unit`. Display: "2 × 400 g". Edit mode added to modal. |
-| Ingredient merge on shopping list | `src/lib/shopping.ts` — `addToShoppingMerged()` | Case-insensitive match; merges pcs or amounts when units match; batch-safe |
-| Tick → add to pantry prompt | `shopping/page.tsx` | Inline prompt when item ticked; pre-fills quantity from structured fields |
-| Timezone bug fix — "Today" label | `src/app/menu/page.tsx` + `PlanRecipeModal.tsx` | Replaced `toISOString()` with local date components to fix UTC offset in Estonia |
-| Edit button on shopping items | `AddShoppingItemModal.tsx` | Dual-mode modal (add / edit); updates existing row |
-| MarkCookedModal rewrite — auto-deduction | `src/components/MarkCookedModal.tsx` | **No manual input.** Checkbox only for items where recipe units match pantry units. ⚠️ shown + skipped when units differ or recipe has no amount. Auto-deducts on confirm. |
-| PlanRecipeModal — AI ingredients | `src/components/PlanRecipeModal.tsx` | Cook Tonight → Plan now calls `/api/meal-ingredients` to get quantities + units. Falls back to ingredient names if AI fails. |
-| AddMealModal — structured shopping | `src/components/AddMealModal.tsx` | "Add missing to shopping" now uses `addToShoppingMerged` with structured fields instead of legacy text |
-| Expandable ingredient list on menu | `src/app/menu/page.tsx` | Tap meal name to reveal ingredients + quantities. ✓ green = in pantry, · grey = missing. Lazy-loaded, cached. |
+| Swipe-left actions on pantry rows | `src/app/page.tsx` — `SwipeRow` component | Swipe left → 🛒 Shop (green) + 🗑️ Delete (red). Uses refs to avoid stale closure bugs. |
+| Tap/click row to open edit modal | `src/app/page.tsx` | Replaces the ✏️ pencil icon. Works on mobile (tap) and desktop (click). |
+| Delete button in edit modal | `src/components/AddPantryItemModal.tsx` | `onDeleted` prop + red "Delete item" button in footer — desktop parity for swipe delete. |
+| i18n `pmodal_delete_btn` | `src/lib/i18n.ts` | EN: "Delete item" · ET: "Kustuta toode" · RU: "Удалить товар" |
+| Fix: action buttons always visible | `src/app/page.tsx` | `absolute` buttons were painting above static content div. Fix: added `relative` to content wrapper so it stacks on top. |
+| Fix: vertical scroll triggered edit modal | `src/app/page.tsx` | Vertical swipe set `dragging=false` but left `moved=false`, so touchEnd fired `onTap()`. Fix: set `moved=true` when vertical movement > 8px. |
+| Fix: keyboard opened on edit modal | `src/components/AddPantryItemModal.tsx` | Removed `autoFocus` from item name input. Keyboard now only opens when user deliberately taps a field. |
+| Fix: receipt → pantry food sub-categories | `ImportReceiptModal.tsx` + DB migration | DB CHECK constraint blocked `food_veg`, `food_dairy`, etc. User ran SQL migration; modal now inserts `item.category` directly. |
+| Fix: expense step blank after receipt import | `ImportReceiptModal.tsx` | Scroll position retained from review step. Fix: `bodyRef.current?.scrollTo({ top: 0 })` on step transition. |
+| Fix: action bar pinned above BottomNav | `src/app/page.tsx` | Restructured page as `flex flex-col h-full`; scrollable content `flex-1 min-h-0 overflow-y-auto`; action bar `flex-shrink-0`. |
+| Fix: Import Receipt button green | `src/app/page.tsx` + `git push` | Button was white. Root cause: 6 commits never pushed to GitHub — Vercel deploys from GitHub only. |
 
 ---
 
@@ -28,15 +30,17 @@
 | Auth + household + invite | ✅ Working | Multi-household, fully isolated |
 | EN/ET/RU UI translations | ✅ Working | All strings translated incl. receipt scan items |
 | Pantry — full CRUD + search + expiry | ✅ Working | |
+| Pantry — swipe-left (Shop / Delete) | ✅ Working | Mobile swipe; desktop: edit modal → Delete button |
+| Pantry — tap/click row to edit | ✅ Working | No keyboard on open (autoFocus removed) |
 | Pantry — reservation badges | ✅ Working | Violet border + 📅 name on items reserved for upcoming meals |
 | Pantry — deduction when cooked | ✅ Working | Auto-deducts recipe qty; skips unit mismatches with ⚠️ |
-| Receipt import → pantry + expenses | ✅ Working | Items translated to user's language at scan time |
+| Receipt import → pantry + expenses | ✅ Working | Food sub-categories working; items translated to user's language |
 | Shopping list — structured quantities | ✅ Working | `pcs × amount_per_pack · unit` display; edit button; tick→pantry prompt |
 | Shopping list — ingredient merge | ✅ Working | Same item added twice merges quantities |
 | Expenses tab | ✅ Working | |
 | Meal Planner — week view | ✅ Working | Today label timezone-fixed |
 | Meal Planner — expandable ingredients | ✅ Working | Tap meal to see ingredients + quantities + pantry status |
-| Cook Tonight AI | ✅ Working | Planning a meal now saves AI-generated quantities to meal_ingredients |
+| Cook Tonight AI | ✅ Working | Planning a meal saves AI-generated quantities to meal_ingredients |
 | Recipes tab | ✅ Working | Browse, add/edit/delete, search — household-isolated |
 | Recipes ↔ Menu two-way | ✅ Working | Menu→Recipes + Recipes→Menu |
 | Household data isolation | ✅ Secure | RLS on all tables + client-side `household_id` filters |
@@ -124,9 +128,15 @@ ALTER TABLE pantry_items ADD COLUMN date_opened date;
 ### UX polish
 | Idea | Effort | Notes |
 |------|--------|-------|
-| **Shopping list grouped by store aisle** | Medium | `category` column already on `shopping_items`. Next: add `section` sub-grouping within Food. Existing items default to 'other' — need keyword auto-detect or user picks section. See food section design below. |
-| **Expense charts / monthly summary** | Medium | Visualise where money goes; bar/pie chart by category across months |
-| "Plan for today / tomorrow" shortcuts | Tiny | Quick buttons in PlanRecipeModal to skip date picker for common cases |
+| **Extend swipe-left to other tabs** | Medium | Shopping + Expenses are candidates. Validate pantry pattern first, then extend. |
+| **Reclassify old pantry items to food sub-categories** | Small | Old items stored as generic `food` before DB migration. SQL keyword reclassification possible. |
+| **Rename "Menu" tab to "Planner"** | Tiny | i18n key `tab_menu` in `src/lib/i18n.ts` + `BottomNav.tsx`. |
+| **Fix hardcoded English greeting in pantry** | Tiny | `"Good to see you, {name}!"` in `src/app/page.tsx` — should use i18n. |
+| **Hide €0.00 categories in Expenses** | Tiny | Monthly summary shows all categories even when zero. |
+| **Receipt review — fewer category pills** | Small | Review step shows all 13 pills per item. Could default to AI-chosen + "Change" to expand. |
+| **Shopping list grouped by store aisle** | Medium | `category` column live on `shopping_items`. See food section design below. |
+| **Expense charts / monthly summary** | Medium | Bar/pie chart by category across months |
+| "Plan for today / tomorrow" shortcuts | Tiny | Quick buttons in PlanRecipeModal to skip date picker |
 | Household invite via QR code | Small | Alternative to copying the invite link string |
 | Weekly meal plan PDF / share | Large | Export the week as printable or shareable |
 | Notifications — expiry alerts | Medium | Push or email when items expire soon |
@@ -149,109 +159,28 @@ ALTER TABLE pantry_items ADD COLUMN date_opened date;
 | `snacks` | Snacks & Sweets | 🍬 | chocolate, chips, nuts, cookies |
 | `food_other` | Other Food | 🍽️ | anything that doesn't fit above |
 
-**Design decisions to make:**
-- Auto-detect section by keyword (zero friction) vs always show section picker vs both
-- What to do with existing items that have no section (show ungrouped at bottom? default to food_other?)
-- Non-food categories (Household, Personal, etc.) group at top level only — no sub-sections
-
 ### Store price comparison (future — blocked on data)
 | Idea | Effort | Blocker |
 |------|--------|---------|
-| Compare shopping list total across Rimi / Selver / Coop / Maxima | Large | No official public price APIs exist for Baltic grocery chains. Only possible via web scraping (fragile, ToS-grey) or a third-party aggregator like kaubahind.ee if they expose an API. |
+| Compare shopping list total across Rimi / Selver / Coop / Maxima | Large | No official public price APIs for Baltic chains. Web scraping only (fragile, ToS-grey). |
 
 ---
 
-## Session 12 — BA Release Notes
+## Git discipline — lesson from this session
 
-### Family Hub — Session 12 Enhancements
-**Release date:** 16-Jun-2026
-
----
-
-#### 1. Auto-deduction when marking a meal as cooked
-
-**Feature area:** Meal Planner → Mark as Cooked
-
-**What changed:**
-The "Mark as Cooked" modal was rewritten to eliminate all manual input. The system now auto-deducts recipe quantities from pantry automatically.
-
-**User story:**
-> As a family member, I want the app to automatically deduct used ingredients from the pantry when I mark a meal as cooked, so I don't have to type amounts manually.
-
-**Acceptance criteria — met:**
-- Given a meal has ingredients with recipe quantities and matching pantry units → deduction happens automatically on confirm
-- Given units differ (e.g. recipe says "1 pc", pantry has "1 kg") → ingredient shows ⚠️ "units differ" and is skipped; pantry item is NOT deleted
-- Given a recipe ingredient has no quantity recorded → ingredient shows ⚠️ "no amount" and is skipped
-- User can uncheck any ingredient to exclude it from deduction
-- No manual input fields anywhere in the modal
-
-**Bug fixed:** Previously, a unit mismatch caused the entire pantry item to be deleted (comparison failed and fell to the delete branch). This is now fully resolved.
+Vercel auto-deploys from GitHub (`main` branch). Local commits are invisible to the deployed app. After every commit: **`git push origin main`**.
 
 ---
 
-#### 2. AI ingredient quantities for Cook Tonight planned meals
+## SwipeRow — architecture notes (do not revisit)
 
-**Feature area:** Cook Tonight → Plan a meal
+`SwipeRow` component lives at the top of `src/app/page.tsx` (before `PantryPage`).
 
-**What changed:**
-When a user plans a meal from Cook Tonight suggestions, the app now calls the AI to retrieve ingredient names, quantities, and units (scaled to the selected number of servings). Previously, ingredients were saved with no quantity.
-
-**User story:**
-> As a user who plans meals from Cook Tonight, I want the saved meal to include ingredient quantities so I can see what's needed and auto-deduct correctly when I cook it.
-
-**Acceptance criteria — met:**
-- Given a Cook Tonight suggestion is planned with 4 servings → `meal_ingredients` is populated with AI-suggested quantities and units
-- Given the AI call fails → falls back to saving ingredient names only (no quantities), no error shown
-- Ingredients are matched against existing pantry items (pantry_item_id set where matched)
-
----
-
-#### 3. Expandable ingredient list on the menu weekly view
-
-**Feature area:** Meal Planner — weekly view
-
-**What changed:**
-Each meal card in the weekly view now has an expand/collapse toggle. Tapping the meal name reveals the full ingredient list with quantities and pantry availability status.
-
-**User story:**
-> As a user planning meals for the week, I want to see what ingredients a planned meal requires directly from the menu view, so I know what to prepare or buy without opening a separate screen.
-
-**Acceptance criteria — met:**
-- Tap meal name → ingredients load and appear inline (lazy-loaded, cached after first load)
-- Each ingredient shows: name, quantity + unit (if set), ✓ green if in pantry / · grey if missing
-- Tap again → collapses
-- Cooked meals also show ingredients when expanded
-- If no ingredients recorded → "No ingredients recorded" message shown
-
----
-
-#### 4. Structured quantities on shopping list
-
-**Feature area:** Shopping List
-
-**What changed:**
-Shopping items now support three structured fields — `pcs` (number of packs), `amount_per_pack` (quantity per pack), `unit` — in addition to a legacy text field. Display adapts: "2 × 400 g", "1 × 10 pc", "500 g", etc.
-
-**User story:**
-> As a shopper, I want to see exactly how many packs and what size each shopping item refers to, so I buy the right amount without guessing.
-
-**Acceptance criteria — met:**
-- Add item modal has pcs + amount fields + unit pill buttons (g, kg, mL, L, pc, pack, box)
-- Edit button on each item opens pre-filled modal
-- When item is ticked, a prompt appears to add it to pantry with the quantity pre-filled
-- Missing meal ingredients added to shopping list use structured fields (not legacy text)
-- Duplicate items are merged: same unit + same pack size → pcs added; different amounts, same unit → totalled
-
----
-
-#### 5. Timezone fix — "Today" label
-
-**Feature area:** Meal Planner + Plan Recipe modal
-
-**Bug fixed:**
-"Today" label was showing on the wrong day for users in UTC+ timezones (e.g. Estonia, UTC+3). `toISOString()` converts to UTC before formatting, causing a -3 hour offset that shifts the date backwards at midnight.
-
-**Fix:** Replaced with local date component formatting (`getFullYear()`, `getMonth()`, `getDate()`) in both `menu/page.tsx` and `PlanRecipeModal.tsx`.
+Key design decisions:
+- **All position tracking uses refs** (`curOffset`, `startX`, `startY`, `moved`, `dragging`) — avoids stale closures in touch handlers
+- **`didTouch` ref** — prevents double-fire: touchEnd fires `onTap()`, then browser fires a click event; `didTouch` skips the click if touch already handled it
+- **Content div must be `relative`** — `absolute` action buttons paint above `static` elements; `relative` on the content wrapper ensures it stacks on top and covers buttons at rest
+- **Vertical scroll detection** — when `Math.abs(dy) > Math.abs(dx) + 5` AND `dy > 8px`, sets `moved=true` so touchEnd skips `onTap()`. Prevents scroll from opening edit modal.
 
 ---
 
@@ -301,6 +230,7 @@ Client-side every SELECT also carries `.eq('household_id', profile.household_id)
 - **No recipe preload** — removed in session 11; every household starts blank
 - **i18n: no function values** — all translation values are strings; use `{n}` template for dynamic text
 - **Structured shopping quantities** — `pcs`, `amount_per_pack`, `unit` columns on `shopping_items`; legacy `quantity` (text) kept for backward compat; `addToShoppingMerged()` handles all merge logic
+- **SwipeRow refs over state** — touch position tracking via refs; `didTouch` prevents double-fire; content div must be `relative` to stack above absolute action buttons
 
 ---
 
@@ -310,27 +240,27 @@ Client-side every SELECT also carries `.eq('household_id', profile.household_id)
 |------|---------|
 | `src/lib/i18n.ts` | EN/ET/RU dictionary; `useT()` + `useCatLabel()` hooks |
 | `src/lib/shopping.ts` | `addToShoppingMerged()` — merge-or-insert with structured quantity logic |
-| `src/lib/categories.ts` | Shared Category type + CATEGORIES array |
+| `src/lib/categories.ts` | Shared Category type + CATEGORIES array + `isFoodFamily()` |
 | `src/lib/supabase.ts` | Supabase client singleton (anon key — RLS applies) |
 | `src/contexts/AuthContext.tsx` | Auth state, profile, useAuth() |
 | `src/components/AuthShell.tsx` | Route guard + layout |
 | `src/components/BottomNav.tsx` | 5-tab bottom nav |
-| `src/components/AddPantryItemModal.tsx` | Add/edit pantry item |
+| `src/components/AddPantryItemModal.tsx` | Add/edit pantry item; `onDeleted` prop + Delete button in footer; no autoFocus |
 | `src/components/AddShoppingItemModal.tsx` | Add/edit shopping item — dual-mode, structured quantity fields |
 | `src/components/AddExpenseModal.tsx` | Manual expense entry |
-| `src/components/ImportReceiptModal.tsx` | Receipt import — translates items via language param |
+| `src/components/ImportReceiptModal.tsx` | Receipt import — language-aware; scroll reset on step change |
 | `src/components/AddMealModal.tsx` | Add/edit meal — has "Pick from recipes" option |
 | `src/components/MarkCookedModal.tsx` | Mark meal as cooked + auto pantry deduction (no manual input) |
 | `src/components/CookTonightModal.tsx` | Cook Tonight AI modal |
 | `src/components/AddRecipeModal.tsx` | Add/edit recipe |
 | `src/components/PlanRecipeModal.tsx` | Plan any meal — calls AI for ingredients; timezone-safe date |
 | `src/components/ProfileSheet.tsx` | Account sheet — language picker, invite, sign out |
-| `src/app/page.tsx` | Pantry tab |
+| `src/app/page.tsx` | Pantry tab — `SwipeRow` component, flex layout, tap-to-edit, action bar above BottomNav |
 | `src/app/shopping/page.tsx` | Shopping list — structured quantities, tick→pantry prompt |
 | `src/app/menu/page.tsx` | Meal planner — expandable ingredient cards, Today fix |
 | `src/app/recipes/page.tsx` | Recipes tab |
 | `src/app/expenses/page.tsx` | Expenses tab |
-| `src/app/api/parse-receipt/route.ts` | Receipt parsing — language-aware |
+| `src/app/api/parse-receipt/route.ts` | Receipt parsing — language-aware, food sub-categories in system prompt |
 | `src/app/api/cook-tonight/route.ts` | Cook Tonight AI |
 | `src/app/api/meal-ingredients/route.ts` | Meal ingredient extraction — returns name + quantity + unit + pantry_item_id |
 
