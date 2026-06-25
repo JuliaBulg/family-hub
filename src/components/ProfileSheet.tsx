@@ -7,6 +7,12 @@ import type { Pet } from '@/contexts/AuthContext'
 import { supabase } from '@/lib/supabase'
 import { useT } from '@/lib/i18n'
 
+const LANGUAGES = [
+  { code: 'en', abbr: 'ENG', label: 'English' },
+  { code: 'et', abbr: 'EST', label: 'Eesti'   },
+  { code: 'ru', abbr: 'RUS', label: 'Русский'  },
+]
+
 const PET_TYPES = [
   { type: 'dog',    emoji: '🐕' },
   { type: 'cat',    emoji: '🐈' },
@@ -37,8 +43,9 @@ export default function ProfileSheet({ open, onClose }: Props) {
   const [signingOut, setSigningOut]       = useState(false)
   const [mounted, setMounted]             = useState(false)
 
-  const [savingLang, setSavingLang] = useState(false)
-  const [langSaved, setLangSaved]   = useState(false)
+  const [savingLang, setSavingLang]       = useState(false)
+  const [langDropdownOpen, setLangDropdownOpen] = useState(false)
+  const langDropdownRef = useRef<HTMLDivElement>(null)
 
   const [numPeople, setNumPeople]         = useState<number>(profile?.num_people ?? 1)
   const [pets, setPets]                   = useState<Pet[]>(profile?.pets ?? [])
@@ -53,12 +60,6 @@ export default function ProfileSheet({ open, onClose }: Props) {
   const petsRef      = useRef(pets)
   numPeopleRef.current = numPeople
   petsRef.current      = pets
-
-  const LANGUAGES = [
-    { code: 'en', flag: '🇬🇧', label: 'English' },
-    { code: 'et', flag: '🇪🇪', label: 'Eesti'   },
-    { code: 'ru', flag: '🇷🇺', label: 'Русский'  },
-  ]
 
   useEffect(() => { setMounted(true) }, [])
 
@@ -98,15 +99,23 @@ export default function ProfileSheet({ open, onClose }: Props) {
     return () => { if (saveTimer.current) clearTimeout(saveTimer.current) }
   }, [numPeople, pets])
 
+  useEffect(() => {
+    if (!langDropdownOpen) return
+    function handleClick(e: MouseEvent) {
+      if (langDropdownRef.current && !langDropdownRef.current.contains(e.target as Node)) {
+        setLangDropdownOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [langDropdownOpen])
+
   async function changeLanguage(lang: string) {
     if (!user) return
     setSavingLang(true)
-    setLangSaved(false)
     await supabase.from('profiles').update({ language: lang }).eq('user_id', user.id)
     await refreshProfile()
     setSavingLang(false)
-    setLangSaved(true)
-    setTimeout(() => setLangSaved(false), 2000)
   }
 
   async function changeRole(userId: string, newRole: 'parent' | 'child') {
@@ -177,43 +186,47 @@ export default function ProfileSheet({ open, onClose }: Props) {
           {/* Header */}
           <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-slate-100 flex-shrink-0">
             <h2 className="text-base font-semibold text-slate-700">{t('profile_account')}</h2>
-            <button
-              onClick={onClose}
-              className="w-8 h-8 flex items-center justify-center rounded-full bg-slate-100 text-slate-500 text-xl leading-none hover:bg-slate-200 transition-colors"
-            >×</button>
+            <div className="flex items-center gap-2">
+              {/* Language pill */}
+              <div className="relative" ref={langDropdownRef}>
+                <button
+                  onClick={() => setLangDropdownOpen(v => !v)}
+                  disabled={savingLang}
+                  className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-slate-200 bg-slate-50 hover:bg-slate-100 text-xs font-semibold text-slate-600 transition-colors disabled:opacity-50"
+                >
+                  <span>{LANGUAGES.find(l => l.code === (profile?.language ?? 'en'))?.abbr ?? 'ENG'}</span>
+                  <span className="text-slate-400 text-[10px]">▾</span>
+                </button>
+                {langDropdownOpen && (
+                  <div className="absolute right-0 top-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg overflow-hidden z-10 min-w-[130px]">
+                    {LANGUAGES.map(lang => (
+                      <button
+                        key={lang.code}
+                        onClick={() => { void changeLanguage(lang.code); setLangDropdownOpen(false) }}
+                        disabled={savingLang}
+                        className={`w-full flex items-center justify-between px-4 py-2.5 text-sm transition-colors ${
+                          (profile?.language ?? 'en') === lang.code
+                            ? 'bg-emerald-50 text-emerald-700 font-semibold'
+                            : 'text-slate-600 hover:bg-slate-50'
+                        }`}
+                      >
+                        <span className="font-mono text-xs">{lang.abbr}</span>
+                        <span className="text-slate-400 text-xs ml-3">{lang.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <button
+                onClick={onClose}
+                className="w-8 h-8 flex items-center justify-center rounded-full bg-slate-100 text-slate-500 text-xl leading-none hover:bg-slate-200 transition-colors"
+              >×</button>
+            </div>
           </div>
 
           <div className="overflow-y-auto flex-1 px-6 py-5 space-y-5">
 
-            {/* 1. Language */}
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide">{t('profile_lang_label')}</p>
-                {savingLang && <p className="text-xs text-slate-400">{t('profile_lang_saving')}</p>}
-                {langSaved  && <p className="text-xs text-emerald-600 font-medium">{t('profile_lang_saved')}</p>}
-              </div>
-              <div className="flex gap-2">
-                {LANGUAGES.map(lang => (
-                  <button
-                    key={lang.code}
-                    onClick={() => void changeLanguage(lang.code)}
-                    disabled={savingLang}
-                    className={`flex-1 flex flex-col items-center py-2.5 rounded-xl border text-sm font-medium transition-colors disabled:opacity-60 ${
-                      (profile?.language ?? 'en') === lang.code
-                        ? 'bg-emerald-500 text-white border-emerald-500'
-                        : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
-                    }`}
-                  >
-                    <span className="text-xl">{lang.flag}</span>
-                    <span className="text-xs mt-0.5">{lang.label}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="border-t border-slate-100" />
-
-            {/* 2. Identity */}
+            {/* 1. Identity */}
             <div className="flex items-center gap-4">
               <div className="w-14 h-14 rounded-full bg-emerald-500 flex items-center justify-center flex-shrink-0 shadow-sm">
                 <span className="text-white text-lg font-bold">{initials}</span>
