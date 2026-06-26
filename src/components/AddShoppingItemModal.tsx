@@ -1,12 +1,33 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
 import { CATEGORIES } from '@/lib/categories'
 import { useT, useCatLabel } from '@/lib/i18n'
 
 const UNITS = ['g', 'kg', 'mL', 'L', 'pc', 'pack', 'box']
+
+const KEYWORD_CATS: { kws: string[]; cat: string }[] = [
+  { cat: 'food_veg',    kws: ['tomato', 'tomat', 'помидор', 'carrot', 'porgand', 'морковь', 'potato', 'kartul', 'картофель', 'onion', 'sibul', 'лук', 'pepper', 'paprika', 'перец', 'cucumber', 'kurk', 'огурец', 'lettuce', 'salat', 'салат', 'spinach', 'шпинат', 'apple', 'õun', 'яблоко', 'banana', 'банан', 'orange', 'apelsin', 'апельсин', 'berry', 'mari', 'ягода', 'grape', 'viinamari', 'виноград', 'cabbage', 'kapsas', 'капуста', 'broccoli', 'brokkoli', 'брокколи', 'garlic', 'küüslauk', 'чеснок', 'mushroom', 'seen', 'гриб', 'avocado', 'авокадо', 'lemon', 'sidrun', 'лимон', 'strawberry', 'maasikas', 'клубника', 'vegetable', 'köögivili', 'овощ', 'fruit', 'puuvili', 'фрукт', 'pear', 'pirn', 'груша', 'plum', 'ploom', 'слива', 'herb', 'ürt', 'зелень'] },
+  { cat: 'food_dairy',  kws: ['milk', 'piim', 'молоко', 'cheese', 'juust', 'сыр', 'butter', 'või', 'масло сливочное', 'yogurt', 'jogurt', 'йогурт', 'kefir', 'keefir', 'кефир', 'cream', 'koor', 'сметана', 'cottage', 'kodujuust', 'творог', 'egg', 'muna', 'яйцо', 'яйца', 'quark', 'kohupiim'] },
+  { cat: 'food_meat',   kws: ['chicken', 'kana', 'курица', 'beef', 'veise', 'говядина', 'pork', 'seali', 'свинина', 'fish', 'kala', 'рыба', 'salmon', 'lõhe', 'сёмга', 'sausage', 'vorst', 'колбаса', 'bacon', 'peekon', 'бекон', 'mince', 'hakkliha', 'фарш', 'shrimp', 'krevetid', 'креветки', 'tuna', 'tuunikala', 'тунец', 'turkey', 'kalkun', 'индейка', 'lamb', 'talleliha', 'ягнёнок', 'herring', 'heeringas', 'сельдь', 'fillet', 'филе'] },
+  { cat: 'food_bread',  kws: ['bread', 'leib', 'хлеб', 'sai', 'baguette', 'bagel', 'roll', 'bun', 'pastry', 'croissant', 'pita', 'tortilla', 'wrap', 'булка', 'батон'] },
+  { cat: 'food_dry',    kws: ['pasta', 'makaronid', 'макароны', 'rice', 'riis', 'рис', 'flour', 'jahu', 'мука', 'olive oil', 'sunflower', 'sauce', 'kaste', 'соус', 'ketchup', 'ketšup', 'кетчуп', 'canned', 'konserv', 'консервы', 'sugar', 'suhkur', 'сахар', 'salt', 'sool', 'соль', 'lentil', 'läätse', 'чечевица', 'bean', 'uba', 'фасоль', 'honey', 'mesi', 'мёд', 'jam', 'moos', 'варенье', 'vinegar', 'äädikas', 'уксус', 'noodle', 'vermišel', 'oat', 'kaer', 'овсянка', 'cereal', 'hommikuhelbed', 'хлопья'] },
+  { cat: 'food_frozen', kws: ['frozen', 'külmutatud', 'замороженный', 'ice cream', 'jäätis', 'мороженое'] },
+  { cat: 'food_snacks', kws: ['chocolate', 'šokolaad', 'шоколад', 'chip', 'krõps', 'чипсы', 'nut', 'pähkel', 'орех', 'candy', 'конфета', 'cookie', 'küpsis', 'печенье', 'wafer', 'vahvel', 'вафля', 'popcorn', 'попкорн', 'cracker', 'kreeker', 'крекер', 'snack'] },
+  { cat: 'food_drinks', kws: ['juice', 'mahl', 'сок', 'water', 'vesi', 'вода', 'beer', 'õlu', 'пиво', 'wine', 'vein', 'вино', 'coffee', 'kohv', 'кофе', 'tea', 'tee', 'чай', 'soda', 'limonaad', 'газировка', 'cola', 'energy drink', 'smoothie', 'mineral', 'mineraal'] },
+  { cat: 'household',   kws: ['detergent', 'pesuvahend', 'порошок', 'toilet paper', 'tualettpapar', 'туалетная бумага', 'trash bag', 'prügikott', 'мусорный пакет', 'sponge', 'käsn', 'губка', 'cleaner', 'puhastusvahend', 'средство', 'dishwasher', 'nõudepesu', 'washing powder', 'fabric softener', 'paper towel', 'majapidamispaber'] },
+  { cat: 'personal',    kws: ['shampoo', 'šampoon', 'шампунь', 'conditioner', 'palsam', 'кондиционер', 'toothpaste', 'hambapasta', 'зубная паста', 'toothbrush', 'hambahari', 'зубная щётка', 'deodorant', 'дезодорант', 'shower gel', 'dušigeel', 'гель для душа', 'razor', 'raseerija', 'бритва', 'mascara', 'тушь', 'face cream', 'näokreem', 'крем для лица', 'lotion', 'лосьон', 'perfume', 'parfüüm', 'духи'] },
+  { cat: 'medicine',    kws: ['vitamin', 'vitamiin', 'витамин', 'supplement', 'toidulisand', 'добавка', 'medicine', 'ravim', 'лекарство', 'pill', 'tablett', 'таблетка', 'pharmacy', 'apteek'] },
+  { cat: 'pets',        kws: ['dog food', 'koera toit', 'корм для собак', 'cat food', 'kassi toit', 'корм для кошек', 'pet', 'lemmikloom', 'litter', 'kassiliiv', 'наполнитель'] },
+]
+
+function detectCategory(name: string): string | null {
+  const lower = name.toLowerCase()
+  const match = KEYWORD_CATS.find(({ kws }) => kws.some(kw => lower.includes(kw)))
+  return match?.cat ?? null
+}
 
 interface ShoppingItem {
   id: string
@@ -36,6 +57,12 @@ export default function AddShoppingItemModal({ onClose, onAdded, item }: Props) 
   const [category, setCategory]   = useState(item?.category ?? 'other')
   const [saving, setSaving]       = useState(false)
   const [error, setError]         = useState('')
+
+  useEffect(() => {
+    if (isEdit) return
+    const detected = detectCategory(name)
+    if (detected) setCategory(detected)
+  }, [name, isEdit])
 
   function toggleUnit(u: string) {
     setUnit(prev => prev === u ? '' : u)

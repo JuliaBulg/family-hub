@@ -9,6 +9,16 @@ import { useT } from '@/lib/i18n'
 // Survives component unmount — prevents deleted items reappearing during navigation
 const deletedIds = new Set<string>()
 
+const CATEGORY_ORDER: Record<string, number> = {
+  food_veg: 0, food_dairy: 1, food_meat: 2, food_bread: 3,
+  food_dry: 4, food_frozen: 5, food_snacks: 6, food_drinks: 7,
+  food_other: 8, food: 8, drinks: 7,
+  household: 9, personal: 10, medicine: 11, pets: 12, other: 13,
+}
+function catOrder(cat: string | null): number {
+  return cat ? (CATEGORY_ORDER[cat] ?? 13) : 13
+}
+
 interface ShoppingItem {
   id: string
   name: string
@@ -128,6 +138,11 @@ export default function ShoppingPage() {
 
   const doneCount = items.filter((i) => i.is_ticked).length
 
+  const sortedItems = [
+    ...items.filter(i => !i.is_ticked).sort((a, b) => catOrder(a.category) - catOrder(b.category)),
+    ...items.filter(i => i.is_ticked).sort((a, b) => catOrder(a.category) - catOrder(b.category)),
+  ]
+
   return (
     <div className="flex flex-col min-h-full">
       <div className="flex-1 px-4 pt-4">
@@ -151,7 +166,7 @@ export default function ShoppingPage() {
         </div>
 
         <div className="space-y-2 mb-4">
-          {items.map((item) => (
+          {sortedItems.map((item) => (
             <div key={item.id}>
               <div className="flex items-center gap-3 bg-white rounded-xl px-3 py-2.5 border border-slate-100">
                 <button
