@@ -25,6 +25,7 @@ function SwipeRow({ children, onTap, onDelete, onAddToShopping }: {
   const moved      = useRef(false)
   const dragging   = useRef(false)
   const didTouch   = useRef(false)
+  const touchTarget = useRef<EventTarget | null>(null)
 
   function onTouchStart(e: React.TouchEvent<HTMLDivElement>) {
     startX.current      = e.touches[0].clientX
@@ -32,6 +33,7 @@ function SwipeRow({ children, onTap, onDelete, onAddToShopping }: {
     moved.current       = false
     dragging.current    = true
     didTouch.current    = true
+    touchTarget.current = e.target
     startOffset.current = curOffset.current
   }
 
@@ -51,6 +53,8 @@ function SwipeRow({ children, onTap, onDelete, onAddToShopping }: {
     dragging.current = false
     if (!moved.current) {
       if (curOffset.current < 0) { curOffset.current = 0; setOffset(0); return }
+      const el = touchTarget.current as HTMLElement | null
+      if (el?.closest('button')) return
       onTap()
       return
     }
