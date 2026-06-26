@@ -357,7 +357,7 @@ export default function PantryPage() {
       <div className="mb-3">
         <h1 className="text-xl font-bold text-slate-800">🏠 Home Hub</h1>
         <p className="text-slate-500 text-xs mt-0.5">
-          {profile?.display_name ? `Good to see you, ${profile.display_name}! 👋` : 'Good to see you! 👋'}
+          {profile?.display_name ? t('greeting').replace('{name}', profile.display_name) : t('greeting_anon')}
         </p>
       </div>
 

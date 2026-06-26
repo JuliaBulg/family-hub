@@ -100,6 +100,7 @@ export default function ExpensesPage() {
             const barWidth    = catTotal > 0 ? Math.max((catTotal / maxCategoryTotal) * 100, 6) : 0
             const isOpen      = expanded === cat.value
 
+            if (catTotal === 0) return null
             return (
               <div key={cat.value} className="bg-white border border-slate-100 rounded-2xl overflow-hidden shadow-sm">
                 <button

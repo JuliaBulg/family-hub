@@ -3,8 +3,9 @@ import { useAuth } from '@/contexts/AuthContext'
 const T = {
   en: {
     // Tabs
-    tab_pantry: 'Pantry', tab_shopping: 'Shopping', tab_menu: 'Menu',
+    tab_pantry: 'Pantry', tab_shopping: 'Shopping', tab_menu: 'Planner',
     tab_recipes: 'Recipes', tab_expenses: 'Expenses',
+    greeting: 'Good to see you, {name}! 👋', greeting_anon: 'Good to see you! 👋',
 
     // Categories
     cat_food: 'Food & Groceries', cat_drinks: 'Drinks & Extras',
@@ -228,8 +229,9 @@ const T = {
     receipt_error_save: 'Could not save items. Please try again.',
   },
   et: {
-    tab_pantry: 'Sahver', tab_shopping: 'Ostud', tab_menu: 'Menüü',
+    tab_pantry: 'Sahver', tab_shopping: 'Ostud', tab_menu: 'Planner',
     tab_recipes: 'Retseptid', tab_expenses: 'Kulud',
+    greeting: 'Tere tulemast, {name}! 👋', greeting_anon: 'Tere tulemast! 👋',
 
     cat_food: 'Toit ja toidukaubad', cat_drinks: 'Joogid ja lisad',
     cat_household: 'Kodutarbed', cat_personal: 'Ilu ja hooldus',
@@ -435,8 +437,9 @@ const T = {
     receipt_error_save: 'Toodete salvestamine ebaõnnestus. Proovi uuesti.',
   },
   ru: {
-    tab_pantry: 'Продукты', tab_shopping: 'Покупки', tab_menu: 'Меню',
+    tab_pantry: 'Продукты', tab_shopping: 'Покупки', tab_menu: 'Планнер',
     tab_recipes: 'Рецепты', tab_expenses: 'Расходы',
+    greeting: 'Рады видеть тебя, {name}! 👋', greeting_anon: 'Рады видеть тебя! 👋',
 
     cat_food: 'Продукты питания', cat_drinks: 'Напитки и прочее',
     cat_household: 'Хозтовары', cat_personal: 'Красота и уход',
