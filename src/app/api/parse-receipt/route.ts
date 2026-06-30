@@ -29,6 +29,7 @@ Return ONLY valid JSON, no other text:
 {"items":[{"name":"Pasta","category":"food","quantity":"500","unit":"g","price":1.29,"estimated_expiry_days":null}]}`
 
 const LANGUAGE_INSTRUCTION: Record<string, string> = {
+  en: 'IMPORTANT: All item names must be in English. Translate every descriptive word in the product name to English, regardless of the receipt language. For example "hakkliha" → "mince meat", "piim" → "milk", "punane paprika" → "red pepper". Keep only proper brand names (e.g. Leibur, Fazer, KitKat, Macetti) unchanged.',
   et: 'IMPORTANT: All item names must be in Estonian (eesti keel). Translate every descriptive word in the product name to Estonian. Keep brand names (manufacturer or product brand) unchanged.',
   ru: 'IMPORTANT: All item names must be in Russian (на русском языке). Translate EVERY descriptive word — including adjectives, colours, and food types — into Russian. For example "punane paprika" → "красный перец", "leib rukkipala" → "хлеб ржаной". Keep only proper brand names (e.g. Leibur, Fazer, KitKat, Macetti) unchanged. Do not leave any Estonian or other non-Russian words in the output except brand names.',
 }
